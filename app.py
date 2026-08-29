@@ -395,6 +395,8 @@ def download_pdf():
         return "PDF report not found. Please generate report first.", 404
 
 
+
+
 if __name__ == "__main__":
     app.run(debug=True)
 

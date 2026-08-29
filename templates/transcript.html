@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Speech To Text | Smart Meeting Recorder{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-badge">Module 2</div>
+    <h1>Speech to Text Transcription</h1>
+    <p>Convert audio from <code>meetings/meeting.wav</code> into accurate written text using OpenAI Whisper</p>
+</div>
+
+<div class="module-card">
+    <div class="card-action-bar">
+        <div class="status-box">
+            <span class="label">Input Audio:</span>
+            <span id="audio-file-status" class="status-tag tag-wait">
+                <i class="fa-solid fa-file-audio"></i> Checking meetings/meeting.wav...
+            </span>
+        </div>
+
+        <button id="btn-convert-stt" class="btn btn-primary btn-md">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> Convert Speech To Text
+        </button>
+    </div>
+
+    <!-- Alert status -->
+    <div id="stt-alert" class="alert alert-info hidden">
+        <i class="fa-solid fa-circle-info"></i>
+        <span id="stt-alert-text">Click "Convert Speech To Text" to execute <code>speech_to_text.py</code>.</span>
+    </div>
+
+    <!-- Large Transcript Text Box -->
+    <div class="transcript-box-wrapper">
+        <div class="box-header">
+            <div class="box-title">
+                <i class="fa-solid fa-align-left"></i> Meeting Transcript Text
+            </div>
+            <div class="box-actions">
+                <button id="btn-copy-transcript" class="btn btn-outline btn-xs" title="Copy Text">
+                    <i class="fa-solid fa-copy"></i> Copy
+                </button>
+                <span class="file-tag">Saved to meetings/transcript.txt</span>
+            </div>
+        </div>
+
+        <textarea id="transcript-textarea" class="large-textbox" placeholder="Transcript will appear here after speech-to-text processing..." readonly></textarea>
+    </div>
+
+    <div class="card-footer-flex">
+        <a href="{{ url_for('index') }}" class="btn btn-secondary btn-sm">
+            <i class="fa-solid fa-arrow-left"></i> Back to Audio Recording
+        </a>
+        <a href="{{ url_for('summary_page') }}" class="btn btn-primary btn-sm">
+            Proceed to Summarization <i class="fa-solid fa-arrow-right"></i>
+        </a>
+    </div>
+</div>
+{% endblock %}

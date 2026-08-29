@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}PDF Report Generation | Smart Meeting Recorder{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-badge">Module 4</div>
+    <h1>PDF Report Generation</h1>
+    <p>Compile meeting transcript and executive AI summary into a print-ready PDF report using ReportLab</p>
+</div>
+
+<div class="module-card">
+    <div class="card-action-bar">
+        <div class="status-box">
+            <span class="label">Inputs Ready:</span>
+            <span id="report-inputs-status" class="status-tag tag-wait">
+                <i class="fa-solid fa-layer-group"></i> Checking transcript.txt & summary.txt...
+            </span>
+        </div>
+
+        <button id="btn-generate-pdf" class="btn btn-primary btn-md">
+            <i class="fa-solid fa-file-pdf"></i> Generate PDF Report
+        </button>
+    </div>
+
+    <!-- Success / Error Alert Banner -->
+    <div id="report-success-alert" class="alert alert-success hidden">
+        <i class="fa-solid fa-circle-check"></i>
+        <div>
+            <strong>Report Generated Successfully</strong>
+            <p>Your PDF meeting report <code>Meeting_Report.pdf</code> has been created and is ready for download.</p>
+        </div>
+    </div>
+
+    <div id="report-error-alert" class="alert alert-danger hidden">
+        <i class="fa-solid fa-circle-exclamation"></i>
+        <span id="report-error-text">An error occurred during PDF generation.</span>
+    </div>
+
+    <!-- PDF Report Preview & Download Card -->
+    <div class="pdf-preview-card">
+        <div class="pdf-card-header">
+            <div class="pdf-card-title">
+                <i class="fa-solid fa-file-lines"></i> Meeting_Report.pdf Document
+            </div>
+            <span class="pdf-badge">PDF / ReportLab</span>
+        </div>
+
+        <div class="pdf-card-body">
+            <div class="pdf-icon-display">
+                <i class="fa-solid fa-file-pdf"></i>
+                <h3>SMART MEETING RECORDER REPORT</h3>
+                <p>Includes complete timestamped transcript and AI summary briefing.</p>
+            </div>
+
+            <div class="download-action-box">
+                <a id="btn-download-pdf" href="{{ url_for('download_pdf') }}" class="btn btn-success btn-lg disabled" download>
+                    <i class="fa-solid fa-download"></i> Download PDF
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-footer-flex">
+        <a href="{{ url_for('summary_page') }}" class="btn btn-secondary btn-sm">
+            <i class="fa-solid fa-arrow-left"></i> Back to Summary
+        </a>
+        <a href="{{ url_for('index') }}" class="btn btn-outline btn-sm">
+            <i class="fa-solid fa-house"></i> Return to Dashboard
+        </a>
+    </div>
+</div>
+{% endblock %}

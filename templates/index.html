@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block title %}Home Dashboard | Smart Meeting Recorder using Generative AI{% endblock %}
+
+{% block content %}
+<div class="dashboard-hero">
+    <div class="hero-content">
+        <div class="hero-tag">
+            <i class="fa-solid fa-sparkles"></i> AI-Powered Executive Assistant
+        </div>
+        <h1 class="hero-title">Smart Meeting Recorder <span class="gradient-text">Using Generative AI</span></h1>
+        <p class="hero-subtitle">
+            Seamlessly record your meetings, transcribe speech to text using OpenAI Whisper, generate concise executive AI summaries, and export professional PDF report documents in seconds.
+        </p>
+
+        <!-- Workflow Visual Tracker -->
+        <div class="workflow-stepper">
+            <div class="step-item active" id="step-1">
+                <div class="step-icon"><i class="fa-solid fa-microphone"></i></div>
+                <div class="step-text">Record</div>
+            </div>
+            <div class="step-connector"></div>
+            <div class="step-item" id="step-2">
+                <div class="step-icon"><i class="fa-solid fa-file-audio"></i></div>
+                <div class="step-text">Speech To Text</div>
+            </div>
+            <div class="step-connector"></div>
+            <div class="step-item" id="step-3">
+                <div class="step-icon"><i class="fa-solid fa-brain"></i></div>
+                <div class="step-text">AI Summary</div>
+            </div>
+            <div class="step-connector"></div>
+            <div class="step-item" id="step-4">
+                <div class="step-icon"><i class="fa-solid fa-file-pdf"></i></div>
+                <div class="step-text">PDF Report</div>
+            </div>
+            <div class="step-connector"></div>
+            <div class="step-item" id="step-5">
+                <div class="step-icon"><i class="fa-solid fa-download"></i></div>
+                <div class="step-text">Download</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Four Feature Cards -->
+<div class="section-header">
+    <h2>System Core Modules</h2>
+    <p>Four interconnected modules powering end-to-end meeting intelligence</p>
+</div>
+
+<div class="feature-cards-grid">
+    <!-- Card 1 -->
+    <div class="feature-card">
+        <div class="card-icon icon-blue">
+            <i class="fa-solid fa-microphone-lines"></i>
+        </div>
+        <div class="card-badge">Module 1</div>
+        <h3>Audio Recording</h3>
+        <p>Live browser microphone audio capture with Web Audio API, real-time waveform visualization, and WAV file export saved directly to <code>meetings/meeting.wav</code>.</p>
+        <div class="card-footer-link">
+            <a href="#recorder-section"><i class="fa-solid fa-arrow-down"></i> Record Audio</a>
+        </div>
+    </div>
+
+    <!-- Card 2 -->
+    <div class="feature-card">
+        <div class="card-icon icon-purple">
+            <i class="fa-solid fa-language"></i>
+        </div>
+        <div class="card-badge">Module 2</div>
+        <h3>Speech to Text</h3>
+        <p>High-accuracy automatic speech recognition using OpenAI Whisper deep learning model, producing timestamped transcripts in <code>meetings/transcript.txt</code>.</p>
+        <div class="card-footer-link">
+            <a href="{{ url_for('transcript_page') }}"><i class="fa-solid fa-arrow-right"></i> View Transcripts</a>
+        </div>
+    </div>
+
+    <!-- Card 3 -->
+    <div class="feature-card">
+        <div class="card-icon icon-cyan">
+            <i class="fa-solid fa-brain"></i>
+        </div>
+        <div class="card-badge">Module 3</div>
+        <h3>Meeting Summarization</h3>
+        <p>Generative AI summarization extracts core decisions, action items, and key highlights, storing the executive briefing in <code>meetings/summary.txt</code>.</p>
+        <div class="card-footer-link">
+            <a href="{{ url_for('summary_page') }}"><i class="fa-solid fa-arrow-right"></i> View Summary</a>
+        </div>
+    </div>
+
+    <!-- Card 4 -->
+    <div class="feature-card">
+        <div class="card-icon icon-indigo">
+            <i class="fa-solid fa-file-pdf"></i>
+        </div>
+        <div class="card-badge">Module 4</div>
+        <h3>PDF Report Generation</h3>
+        <p>Automated document formatting with ReportLab library, creating structured, print-ready PDF meeting reports exported as <code>Meeting_Report.pdf</code>.</p>
+        <div class="card-footer-link">
+            <a href="{{ url_for('report_page') }}"><i class="fa-solid fa-arrow-right"></i> Generate Report</a>
+        </div>
+    </div>
+</div>
+
+<!-- Audio Recording Interactive Module Section -->
+<section id="recorder-section" class="recorder-section">
+    <div class="recorder-card">
+        <div class="recorder-header">
+            <div class="title-group">
+                <span class="module-pill">Module 1</span>
+                <h2>Live Audio Recording</h2>
+                <p>Record meeting audio directly through your web browser or server microphone</p>
+            </div>
+            <div class="rec-status-pill" id="rec-status-pill">
+                <span class="pulse-dot"></span> <span id="rec-status-label">Ready</span>
+            </div>
+        </div>
+
+        <!-- Audio Waveform Visualizer Canvas -->
+        <div class="visualizer-container">
+            <canvas id="waveform-canvas" width="800" height="120"></canvas>
+            <div id="recording-timer" class="recording-timer">00:00</div>
+        </div>
+
+        <!-- Success Notification Banner -->
+        <div id="recording-success-alert" class="alert alert-success hidden">
+            <i class="fa-solid fa-circle-check"></i>
+            <div>
+                <strong>Recording Completed Successfully</strong>
+                <p>Audio has been saved to <code>meetings/meeting.wav</code>. You can now proceed to Speech-to-Text transcription.</p>
+            </div>
+        </div>
+
+        <!-- Error Notification Banner -->
+        <div id="recording-error-alert" class="alert alert-danger hidden">
+            <i class="fa-solid fa-circle-exclamation"></i>
+            <span id="recording-error-text">An error occurred while capturing audio.</span>
+        </div>
+
+        <!-- Primary Action Buttons -->
+        <div class="action-buttons-group">
+            <button id="btn-start-record" class="btn btn-primary btn-lg">
+                <i class="fa-solid fa-microphone"></i> Start Recording
+            </button>
+            <button id="btn-stop-record" class="btn btn-danger btn-lg" disabled>
+                <i class="fa-solid fa-square"></i> Stop Recording
+            </button>
+        </div>
+
+        <!-- Alternative Upload Audio File Option -->
+        <div class="upload-fallback">
+            <span>Or upload an existing WAV audio file:</span>
+            <form id="upload-form" class="inline-upload-form" enctype="multipart/form-data">
+                <input type="file" id="audio-file-input" name="audio_file" accept="audio/*" class="file-input">
+                <button type="submit" class="btn btn-outline btn-sm">
+                    <i class="fa-solid fa-upload"></i> Upload WAV
+                </button>
+            </form>
+        </div>
+    </div>
+</section>
+
+<!-- Next Action Flow Banner -->
+<div class="next-step-banner">
+    <div class="next-step-info">
+        <h3>Ready for Transcription?</h3>
+        <p>Once audio is recorded, execute OpenAI Whisper speech recognition to generate text transcripts.</p>
+    </div>
+    <div class="next-step-actions">
+        <button id="btn-quick-transcribe" class="btn btn-accent btn-md">
+            <i class="fa-solid fa-bolt"></i> Run Speech-to-Text Now
+        </button>
+        <a href="{{ url_for('transcript_page') }}" class="btn btn-secondary btn-md">
+            Go to Transcript Module <i class="fa-solid fa-arrow-right"></i>
+        </a>
+    </div>
+</div>
+{% endblock %}

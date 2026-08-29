@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block title %}System Modules | Smart Meeting Recorder{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-badge">Architecture & Specifications</div>
+    <h1>System Modules Overview</h1>
+    <p>Detailed specification and real-time status of all four core processing modules</p>
+</div>
+
+<div class="modules-detail-list">
+    <!-- Module 1 -->
+    <div class="module-detail-card">
+        <div class="module-header-row">
+            <div class="module-title-box">
+                <span class="mod-num">Module 1</span>
+                <h2>Audio Recording</h2>
+            </div>
+            <div class="script-badge">recorder.py</div>
+        </div>
+
+        <p class="module-description">
+            Responsible for capturing high-fidelity voice audio through the browser microphone or hardware device. Features real-time frequency visualizer and saves output directly to <code>meetings/meeting.wav</code>.
+        </p>
+
+        <div class="module-meta-grid">
+            <div class="meta-item">
+                <span class="meta-label">Primary Technology</span>
+                <span class="meta-val">Web Audio API / sounddevice</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">Output Artifact</span>
+                <span class="meta-val">meetings/meeting.wav</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">Live Status</span>
+                <span id="mod1-status" class="meta-val tag-wait">Checking...</span>
+            </div>
+        </div>
+
+        <div class="module-action">
+            <a href="{{ url_for('index') }}#recorder-section" class="btn btn-primary btn-sm">
+                <i class="fa-solid fa-microphone"></i> Open Recorder
+            </a>
+        </div>
+    </div>
+
+    <!-- Module 2 -->
+    <div class="module-detail-card">
+        <div class="module-header-row">
+            <div class="module-title-box">
+                <span class="mod-num">Module 2</span>
+                <h2>Speech to Text</h2>
+            </div>
+            <div class="script-badge">speech_to_text.py</div>
+        </div>
+
+        <p class="module-description">
+            Uses OpenAI Whisper acoustic and language models to perform multilingual automatic speech recognition, converting audio input into clear text saved in <code>meetings/transcript.txt</code>.
+        </p>
+
+        <div class="module-meta-grid">
+            <div class="meta-item">
+                <span class="meta-label">Primary Technology</span>
+                <span class="meta-val">OpenAI Whisper</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">Output Artifact</span>
+                <span class="meta-val">meetings/transcript.txt</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">Live Status</span>
+                <span id="mod2-status" class="meta-val tag-wait">Checking...</span>
+            </div>
+        </div>
+
+        <div class="module-action">
+            <a href="{{ url_for('transcript_page') }}" class="btn btn-primary btn-sm">
+                <i class="fa-solid fa-file-lines"></i> Open Transcript Module
+            </a>
+        </div>
+    </div>
+
+    <!-- Module 3 -->
+    <div class="module-detail-card">
+        <div class="module-header-row">
+            <div class="module-title-box">
+                <span class="mod-num">Module 3</span>
+                <h2>Meeting Summarization</h2>
+            </div>
+            <div class="script-badge">summarizer.py</div>
+        </div>
+
+        <p class="module-description">
+            Applies natural language processing transformer algorithms to extract core meeting decisions, agenda highlights, and key takeaways, writing output to <code>meetings/summary.txt</code>.
+        </p>
+
+        <div class="module-meta-grid">
+            <div class="meta-item">
+                <span class="meta-label">Primary Technology</span>
+                <span class="meta-val">Hugging Face Transformers / NLP</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">Output Artifact</span>
+                <span class="meta-val">meetings/summary.txt</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">Live Status</span>
+                <span id="mod3-status" class="meta-val tag-wait">Checking...</span>
+            </div>
+        </div>
+
+        <div class="module-action">
+            <a href="{{ url_for('summary_page') }}" class="btn btn-primary btn-sm">
+                <i class="fa-solid fa-brain"></i> Open Summarizer Module
+            </a>
+        </div>
+    </div>
+
+    <!-- Module 4 -->
+    <div class="module-detail-card">
+        <div class="module-header-row">
+            <div class="module-title-box">
+                <span class="mod-num">Module 4</span>
+                <h2>PDF Report Generation</h2>
+            </div>
+            <div class="script-badge">report_generator.py</div>
+        </div>
+
+        <p class="module-description">
+            Formats transcript text and AI executive summaries into structured PDF report documents using ReportLab platypus engine, generating <code>meetings/Meeting_Report.pdf</code>.
+        </p>
+
+        <div class="module-meta-grid">
+            <div class="meta-item">
+                <span class="meta-label">Primary Technology</span>
+                <span class="meta-val">ReportLab PDF Engine</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">Output Artifact</span>
+                <span class="meta-val">meetings/Meeting_Report.pdf</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">Live Status</span>
+                <span id="mod4-status" class="meta-val tag-wait">Checking...</span>
+            </div>
+        </div>
+
+        <div class="module-action">
+            <a href="{{ url_for('report_page') }}" class="btn btn-primary btn-sm">
+                <i class="fa-solid fa-file-pdf"></i> Open PDF Report Module
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

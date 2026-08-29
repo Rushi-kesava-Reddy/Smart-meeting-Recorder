@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Meeting Summarization | Smart Meeting Recorder{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-badge">Module 3</div>
+    <h1>Meeting Summarization</h1>
+    <p>Distill long meeting transcripts into executive AI summaries using Transformer algorithms</p>
+</div>
+
+<div class="module-card">
+    <div class="card-action-bar">
+        <div class="status-box">
+            <span class="label">Transcript Source:</span>
+            <span id="transcript-file-status" class="status-tag tag-wait">
+                <i class="fa-solid fa-file-lines"></i> Checking meetings/transcript.txt...
+            </span>
+        </div>
+
+        <button id="btn-generate-summary" class="btn btn-accent btn-md">
+            <i class="fa-solid fa-brain"></i> Generate Summary
+        </button>
+    </div>
+
+    <!-- Alert status -->
+    <div id="summary-alert" class="alert alert-info hidden">
+        <i class="fa-solid fa-circle-info"></i>
+        <span id="summary-alert-text">Click "Generate Summary" to execute <code>summarizer.py</code>.</span>
+    </div>
+
+    <!-- Executive Summary Card Container -->
+    <div class="summary-display-card">
+        <div class="summary-card-header">
+            <div class="summary-title">
+                <i class="fa-solid fa-square-poll-vertical"></i> Executive AI Meeting Summary
+            </div>
+            <span class="save-path-tag">meetings/summary.txt</span>
+        </div>
+
+        <div class="summary-card-body">
+            <div id="summary-content" class="summary-text-box">
+                <p class="placeholder-text">Click "Generate Summary" above to process transcript text into concise executive bullet points.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-footer-flex">
+        <a href="{{ url_for('transcript_page') }}" class="btn btn-secondary btn-sm">
+            <i class="fa-solid fa-arrow-left"></i> Back to Transcript
+        </a>
+        <a href="{{ url_for('report_page') }}" class="btn btn-primary btn-sm">
+            Proceed to PDF Report <i class="fa-solid fa-arrow-right"></i>
+        </a>
+    </div>
+</div>
+{% endblock %}

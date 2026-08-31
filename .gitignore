@@ -1,24 +1,14 @@
-# Environment Variables
-.env
-.env.local
-.env.*.local
-
-# Python cache & virtual environment
+.venv/
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
-.venv/
-venv/
-env/
-ENV/
 
-# Dynamic meeting recordings and reports
-meetings/*
-!meetings/.gitkeep
+.env
 
-# IDE and System Files
+meetings/*.wav
+meetings/*.mp3
+meetings/*.m4a
+meetings/transcript.txt
+meetings/summary.txt
+meetings/*.pdf
+
 .vscode/
-.idea/
-.DS_Store
-Thumbs.db

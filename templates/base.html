@@ -1,146 +1,247 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>{% block title %}Smart Meeting Recorder using Generative AI{% endblock %}</title>
-    <meta name="description" content="Modern web application that records meetings, converts speech into text, generates an AI summary, and creates a downloadable PDF meeting report.">
+
+    <meta name="description"
+          content="Modern web application that records meetings, converts speech into text, generates an AI summary, and creates a downloadable PDF meeting report.">
+
     <!-- Google Fonts & Font Awesome Icons -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700&display=swap"
+          rel="stylesheet">
+
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
     <!-- CSS Stylesheet -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+
     {% block extra_css %}{% endblock %}
 </head>
+
 <body>
+
     <div class="app-layout">
+
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
+
             <div class="sidebar-header">
+
                 <div class="logo-wrapper">
-                    <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo" class="app-logo" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%232563eb\'><path d=\'M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z\'/><path d=\'M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z\'/></svg>'">
+                    <img src="{{ url_for('static', filename='images/logo.png') }}"
+                         alt="Logo"
+                         class="app-logo"
+                         onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%232563eb\'><path d=\'M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z\'/><path d=\'M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z\'/></svg>'">
                 </div>
+
                 <div class="sidebar-brand">
                     <h2>SmartRecorder</h2>
                     <span class="badge-ai">Generative AI</span>
                 </div>
+
             </div>
 
             <nav class="sidebar-nav">
+
                 <ul>
+
                     <li>
-                        <a href="{{ url_for('index') }}" class="nav-link {% if request.endpoint == 'index' and request.path == '/' %}active{% endif %}">
+                        <a href="{{ url_for('index') }}"
+                           class="nav-link {% if request.endpoint == 'index' and request.path == '/' %}active{% endif %}">
                             <i class="fa-solid fa-house"></i>
                             <span>Home</span>
                         </a>
                     </li>
+
                     <li>
-                        <a href="{{ url_for('index') }}#recorder-section" class="nav-link">
+                        <a href="{{ url_for('index') }}#recorder-section"
+                           class="nav-link">
                             <i class="fa-solid fa-microphone"></i>
                             <span>Record Meeting</span>
                         </a>
                     </li>
+
                     <li>
-                        <a href="{{ url_for('transcript_page') }}" class="nav-link {% if request.endpoint == 'transcript_page' %}active{% endif %}">
+                        <a href="{{ url_for('transcript_page') }}"
+                           class="nav-link {% if request.endpoint == 'transcript_page' %}active{% endif %}">
                             <i class="fa-solid fa-file-lines"></i>
                             <span>Transcript</span>
                         </a>
                     </li>
+
                     <li>
-                        <a href="{{ url_for('summary_page') }}" class="nav-link {% if request.endpoint == 'summary_page' %}active{% endif %}">
+                        <a href="{{ url_for('summary_page') }}"
+                           class="nav-link {% if request.endpoint == 'summary_page' %}active{% endif %}">
                             <i class="fa-solid fa-wand-magic-sparkles"></i>
                             <span>Summary</span>
                         </a>
                     </li>
+
                     <li>
-                        <a href="{{ url_for('report_page') }}" class="nav-link {% if request.endpoint == 'report_page' %}active{% endif %}">
+                        <a href="{{ url_for('report_page') }}"
+                           class="nav-link {% if request.endpoint == 'report_page' %}active{% endif %}">
                             <i class="fa-solid fa-file-pdf"></i>
                             <span>Report</span>
                         </a>
                     </li>
+
                     <li class="nav-divider"></li>
+
                     <li>
-                        <a href="{{ url_for('modules_page') }}" class="nav-link {% if request.endpoint == 'modules_page' %}active{% endif %}">
+                        <a href="{{ url_for('modules_page') }}"
+                           class="nav-link {% if request.endpoint == 'modules_page' %}active{% endif %}">
                             <i class="fa-solid fa-cubes"></i>
                             <span>Modules</span>
                         </a>
                     </li>
+
                     <li>
-                        <a href="{{ url_for('about_page') }}" class="nav-link {% if request.endpoint == 'about_page' %}active{% endif %}">
+                        <a href="{{ url_for('about_page') }}"
+                           class="nav-link {% if request.endpoint == 'about_page' %}active{% endif %}">
                             <i class="fa-solid fa-circle-info"></i>
                             <span>About</span>
                         </a>
                     </li>
+
                 </ul>
+
             </nav>
 
             <div class="sidebar-footer">
+
                 <div class="status-indicator">
                     <span class="status-dot online"></span>
                     <span class="status-text">Flask System Active</span>
                 </div>
-                <div class="version-tag">v2.0 Final Year Project</div>
+
+                <div class="version-tag">
+                    v2.0 Final Year Project
+                </div>
+
             </div>
+
         </aside>
+
 
         <!-- Main Content Area -->
         <main class="main-wrapper">
+
             <!-- Header Bar -->
             <header class="top-header">
+
                 <div class="header-left">
-                    <button id="sidebar-toggle" class="btn-icon" aria-label="Toggle Sidebar">
+
+                    <button id="sidebar-toggle"
+                            class="btn-icon"
+                            aria-label="Toggle Sidebar">
                         <i class="fa-solid fa-bars"></i>
                     </button>
+
                     <div class="header-title">
+
                         <h1>Smart Meeting Recorder</h1>
-                        <span class="subtitle">Powered by OpenAI Whisper & Transformer Summarization</span>
+
+                        <span class="subtitle">
+                            Powered by OpenAI Whisper & Transformer Summarization
+                        </span>
+
                     </div>
+
                 </div>
 
+
                 <div class="header-right">
+
                     <!-- Quick System Artifact Badges -->
                     <div class="artifact-badges">
-                        <span id="badge-audio" class="badge badge-neutral" title="Audio Status">
-                            <i class="fa-solid fa-volume-high"></i> Audio
+
+                        <span id="badge-audio"
+                              class="badge badge-neutral"
+                              title="Audio Status">
+                            <i class="fa-solid fa-volume-high"></i>
+                            Audio
                         </span>
-                        <span id="badge-transcript" class="badge badge-neutral" title="Transcript Status">
-                            <i class="fa-solid fa-font"></i> Text
+
+                        <span id="badge-transcript"
+                              class="badge badge-neutral"
+                              title="Transcript Status">
+                            <i class="fa-solid fa-font"></i>
+                            Text
                         </span>
-                        <span id="badge-summary" class="badge badge-neutral" title="Summary Status">
-                            <i class="fa-solid fa-brain"></i> AI Summary
+
+                        <span id="badge-summary"
+                              class="badge badge-neutral"
+                              title="Summary Status">
+                            <i class="fa-solid fa-brain"></i>
+                            AI Summary
                         </span>
-                        <span id="badge-pdf" class="badge badge-neutral" title="PDF Status">
-                            <i class="fa-solid fa-file-pdf"></i> PDF
+
+                        <span id="badge-pdf"
+                              class="badge badge-neutral"
+                              title="PDF Status">
+                            <i class="fa-solid fa-file-pdf"></i>
+                            PDF
                         </span>
+
                     </div>
+
                 </div>
+
             </header>
+
 
             <!-- Dynamic Body Content -->
             <div class="content-container">
+
                 <!-- Notification Container for Toast Alerts -->
-                <div id="toast-container" class="toast-container"></div>
+                <div id="toast-container"
+                     class="toast-container">
+                </div>
 
                 {% block content %}{% endblock %}
+
             </div>
+
         </main>
+
     </div>
 
+
     <!-- Global Processing Overlay / Spinner -->
-    <div id="loading-spinner" class="spinner-overlay hidden">
+    <div id="loading-spinner"
+         class="spinner-overlay hidden">
+
         <div class="spinner-card">
+
             <div class="spinner-ring"></div>
-            <h4 id="spinner-title">Processing...</h4>
-            <p id="spinner-desc">Connecting modules and analyzing meeting audio.</p>
+
+            <h4 id="spinner-title">
+                Processing...
+            </h4>
+
+            <p id="spinner-desc">
+                Connecting modules and analyzing meeting audio.
+            </p>
+
         </div>
+
     </div>
+
 
     <!-- Main JavaScript File -->
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+
     {% block extra_js %}{% endblock %}
+
 </body>
+
 </html>

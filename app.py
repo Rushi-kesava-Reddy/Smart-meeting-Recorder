@@ -1,6 +1,6 @@
 """
 Multilingual AI Smart Meeting Recorder & Executive Assistant
-Streamlit Community Cloud & Local Deployment Application.
+Render / Streamlit & Local Deployment Application.
 
 Supports end-to-end meeting workflow:
 🎙️ Audio Capture & Upload
@@ -27,12 +27,15 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Bridge Streamlit Secrets to environment variables
-if hasattr(st, "secrets") and "GROQ_API_KEY" in st.secrets:
-    os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
+# Render / local API key configuration
+# IMPORTANT: Render uses Environment Variables, not Streamlit secrets.toml.
+# Never access st.secrets here because it raises StreamlitSecretNotFoundError
+# when no secrets.toml file exists.
+def get_groq_api_key():
+    return os.getenv("GROQ_API_KEY", "").strip()
 
 # Import backend modules
-from languages import get_supported_languages, get_language_name, get_language_info, get_groq_api_key
+from languages import get_supported_languages, get_language_name, get_language_info
 from speech_to_text import transcribe_audio, save_meeting_state, load_meeting_state
 from translator import translate_text
 from summarizer import generate_summary
@@ -232,7 +235,7 @@ init_session()
 with st.sidebar:
     st.markdown("### 🎙️ SmartRecorder")
     st.markdown("<span class='badge-pill-header'>v3.0 Multilingual AI</span>", unsafe_allow_html=True)
-    st.caption("Multilingual Meeting Intelligence for Streamlit Community Cloud")
+    st.caption("Multilingual Meeting Intelligence for Render / Streamlit")
     
     st.divider()
 
@@ -241,8 +244,8 @@ with st.sidebar:
     if api_key_set:
         st.success("🟢 Groq Whisper API Connected")
     else:
-        st.error("🔴 GROQ_API_KEY Not Configured in Secrets")
-        st.info("Paste your key in `.streamlit/secrets.toml` or Streamlit Cloud App Settings.")
+        st.error("🔴 GROQ_API_KEY Not Configured")
+        st.info("Add `GROQ_API_KEY` in Render → Environment Variables.")
 
     st.divider()
 
@@ -453,7 +456,7 @@ with tab_audio:
         uploaded_file = st.file_uploader(
             "Upload meeting recording",
             type=["wav", "mp3", "m4a", "webm", "ogg"],
-            help="Supports audio files up to 50MB in all standard speech formats."
+            help="Supports audio files up to 25MB in all standard speech formats."
         )
         if uploaded_file is not None:
             audio_bytes = uploaded_file.read()
@@ -490,36 +493,44 @@ with tab_audio:
         st.info("ℹ️ Record audio with the microphone above, upload an audio file, or click a Viva Demo scenario in the sidebar to begin.")
 
     if btn_transcribe and has_audio_on_disk:
-        with st.spinner("Running ultra-fast Groq Whisper speech recognition with automatic container detection..."):
+        with st.spinner("Running Groq Whisper speech recognition..."):
             try:
                 res = transcribe_audio(WAV_PATH, language=selected_stt_lang)
-                if res and res.get("text"):
-                    st.session_state["original_transcript"] = res["text"]
-                    st.session_state["detected_language"] = res["language_code"]
-                    st.session_state["detected_language_name"] = res["language_name"]
-                    st.session_state["transcription_confidence"] = res["confidence"]
-                    st.session_state["duration"] = res["duration"]
-                    st.session_state["word_count"] = res["word_count"]
 
-                    # Persist state
-                    with open(TRANSCRIPT_PATH, "w", encoding="utf-8") as f:
-                        f.write(res["text"])
+                if not res or not res.get("text", "").strip():
+                    raise RuntimeError(
+                        "Groq returned an empty transcript. Please record clear speech and try again."
+                    )
 
-                    save_meeting_state({
-                        "original_transcript": res["text"],
-                        "detected_language": res["language_code"],
-                        "detected_language_name": res["language_name"],
-                        "transcription_confidence": res["confidence"],
-                        "duration": res["duration"],
-                        "word_count": res["word_count"]
-                    })
+                st.session_state["original_transcript"] = res["text"]
+                st.session_state["detected_language"] = res.get("language_code") or "en"
+                st.session_state["detected_language_name"] = res.get("language_name") or get_language_name(st.session_state["detected_language"])
+                st.session_state["transcription_confidence"] = max(0.0, min(1.0, float(res.get("confidence", 0.95))))
+                st.session_state["duration"] = res.get("duration", 0)
+                st.session_state["word_count"] = res.get("word_count", len(res["text"].split()))
 
-                    st.success(f"🎉 Spoken speech recognized as {res['language_name']} ({int(res['confidence']*100)}% accuracy) in ~3 seconds!")
-                    st.rerun()
-                else:
-                    st.error("Speech recognition produced an empty transcript. Please verify audio clarity.")
+                with open(TRANSCRIPT_PATH, "w", encoding="utf-8") as f:
+                    f.write(res["text"])
+
+                save_meeting_state({
+                    "original_transcript": res["text"],
+                    "detected_language": st.session_state["detected_language"],
+                    "detected_language_name": st.session_state["detected_language_name"],
+                    "transcription_confidence": st.session_state["transcription_confidence"],
+                    "duration": st.session_state["duration"],
+                    "word_count": st.session_state["word_count"]
+                })
+
+                st.success(
+                    f"🎉 Speech recognized as {st.session_state['detected_language_name']} "
+                    f"({int(st.session_state['transcription_confidence'] * 100)}% confidence)."
+                )
+                st.rerun()
+
             except Exception as e:
-                st.error(f"Speech recognition error: {e}")
+                st.error(f"❌ Speech recognition failed: {e}")
+                with st.expander("Technical error details"):
+                    st.code(str(e))
 
 
 # ------------------------------------------------------------------------------
@@ -536,7 +547,6 @@ with tab_transcript:
             "Original native speech script:",
             value=st.session_state["original_transcript"],
             height=320,
-            key="orig_transcript_area",
             help="Preserves the exact native script, phrasing, and project terminology."
         )
 
@@ -602,7 +612,6 @@ with tab_transcript:
             "Translated text:",
             value=st.session_state["translated_transcript"],
             height=250,
-            key="translated_transcript_area"
         )
 
         st.download_button(
@@ -891,6 +900,6 @@ with tab_arch:
     3. **How is high speed achieved during speech recognition?**
        - We employ `whisper-large-v3-turbo` on Groq's high-speed inference engine, combined with `detect_audio_container()` in `speech_to_text.py` which inspects binary magic bytes and prevents transcoding mismatches, completing transcription in **~3 seconds**.
        
-    4. **How is the application deployed to Streamlit Community Cloud?**
+    4. **How is the application deployed to Render / Streamlit?**
        - The codebase runs natively with `streamlit run app.py`. All API credentials are read securely from `st.secrets["GROQ_API_KEY"]` with automatic environment fallback, and all bundled fonts in `fonts/` are packaged directly in the repository.
     """)

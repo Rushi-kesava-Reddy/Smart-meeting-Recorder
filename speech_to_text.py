@@ -1,7 +1,6 @@
 """
-Multilingual Speech to Text Module using Groq Whisper.
-Supports auto-detection of spoken languages (Telugu, Hindi, Tamil, English, etc.)
-or manual language selection while preserving original language text.
+Multilingual Speech-to-Text using Groq Whisper.
+Supports automatic language detection and manual language hints.
 """
 
 import os
@@ -10,7 +9,7 @@ import json
 import math
 from dotenv import load_dotenv
 from groq import Groq
-from languages import get_language_info, get_language_name, get_groq_api_key
+from languages import get_language_name
 from language_detector import detect_script_from_text
 
 load_dotenv()
@@ -25,19 +24,23 @@ os.makedirs(MEETINGS_DIR, exist_ok=True)
 
 def load_meeting_state():
     """Load existing meeting state JSON if available."""
-    if os.path.exists(STATE_PATH):
-        try:
-            with open(STATE_PATH, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            pass
-    return {}
+    if not os.path.exists(STATE_PATH):
+        return {}
+
+    try:
+        with open(STATE_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception as e:
+        print(f"[WARN] Could not load meeting state: {e}", file=sys.stderr)
+        return {}
 
 
 def save_meeting_state(state_data):
     """Save or merge meeting state JSON."""
     current = load_meeting_state()
-    current.update(state_data)
+    current.update(state_data or {})
+
     try:
         with open(STATE_PATH, "w", encoding="utf-8") as f:
             json.dump(current, f, ensure_ascii=False, indent=2)
@@ -46,109 +49,154 @@ def save_meeting_state(state_data):
 
 
 def detect_audio_container(file_path):
-    """Detect real container format from audio header bytes to ensure optimal API processing."""
+    """Return a filename and MIME type based on the actual audio header."""
     with open(file_path, "rb") as f:
         header = f.read(64)
+
     if header.startswith(b"RIFF"):
         return "meeting.wav", "audio/wav"
-    elif b"ftyp" in header:
+    if b"ftyp" in header:
         return "meeting.m4a", "audio/mp4"
-    elif header.startswith(b"\x1aE\xdf\xa3"):
+    if header.startswith(b"\x1aE\xdf\xa3"):
         return "meeting.webm", "audio/webm"
-    elif header.startswith(b"OggS"):
+    if header.startswith(b"OggS"):
         return "meeting.ogg", "audio/ogg"
-    elif header.startswith(b"ID3") or header[:2] in (b"\xff\xfb", b"\xff\xf3", b"\xff\xf2"):
+    if header.startswith(b"ID3") or header[:2] in (
+        b"\xff\xfb", b"\xff\xf3", b"\xff\xf2"
+    ):
         return "meeting.mp3", "audio/mpeg"
+
     return "meeting.wav", "audio/wav"
 
 
-def transcribe_audio(wav_path, language="auto"):
+def transcribe_audio(audio_path, language="auto"):
     """
-    Convert audio file to text using Groq Whisper API.
-    
-    Args:
-        wav_path (str): Path to WAV/audio file.
-        language (str): 'auto' or specific ISO code (e.g., 'te', 'hi', 'en').
-        
-    Returns:
-        dict: Transcription results with text, detected language, confidence, etc.
-              or None on failure.
+    Transcribe an audio file with Groq Whisper.
+
+    Parameters
+    ----------
+    audio_path : str
+        Path to the audio file.
+    language : str
+        'auto' or an ISO-639-1 language code such as 'te', 'hi', 'ta', 'en'.
+
+    Returns
+    -------
+    dict
+        text, language_code, language_name, duration, confidence, word_count.
+
+    Raises
+    ------
+    RuntimeError
+        If configuration or the Groq request fails. Raising the exception is
+        intentional so Streamlit can display the real error instead of showing
+        a misleading empty-transcript message.
     """
-    if not os.path.exists(wav_path):
-        print(f"[ERROR] Audio file not found: {wav_path}", file=sys.stderr)
-        return None
 
-    api_key = get_groq_api_key()
-    if not api_key:
-        print("[ERROR] GROQ_API_KEY is not configured in environment or secrets.", file=sys.stderr)
-        return None
+    if not audio_path or not os.path.exists(audio_path):
+        raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
-    file_size_mb = os.path.getsize(wav_path) / (1024 * 1024)
-    print(f"[1] Audio file found: {wav_path} ({file_size_mb:.2f} MB)")
+    file_size = os.path.getsize(audio_path)
+    file_size_mb = file_size / (1024 * 1024)
+
+    if file_size < 1000:
+        raise RuntimeError("The audio file is empty or too small to transcribe.")
 
     if file_size_mb > 25:
-        print("[ERROR] Audio file exceeds 25MB Groq Whisper limit.", file=sys.stderr)
-        return None
+        raise RuntimeError(
+            f"Audio file is {file_size_mb:.2f} MB. "
+            "Please use an audio file within Groq's 25 MB limit."
+        )
+
+    api_key = os.getenv("GROQ_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError(
+            "GROQ_API_KEY is not configured. "
+            "Add GROQ_API_KEY to Render Environment Variables."
+        )
+
+    upload_name, mime_type = detect_audio_container(audio_path)
+
+    print(f"[1] Audio file: {audio_path} ({file_size_mb:.2f} MB)")
+    print(f"[2] Detected container: {upload_name} ({mime_type})")
+    print(f"[2] Language hint: {language}")
 
     try:
-        client = Groq(api_key=api_key)
-        print(f"[2] Connecting to Groq Whisper (Language setting: {language})...")
+        client = Groq(api_key=api_key, timeout=45.0, max_retries=1)
 
-        upload_name, mime_type = detect_audio_container(wav_path)
-        with open(wav_path, "rb") as audio_file:
+        # Read bytes and send them with an explicit filename/MIME type.
+        # This works reliably for WAV, M4A, MP3, WebM and OGG uploads.
+        with open(audio_path, "rb") as audio_file:
             audio_bytes = audio_file.read()
-
-        file_tuple = (upload_name, audio_bytes, mime_type)
 
         whisper_params = {
             "model": "whisper-large-v3-turbo",
-            "file": file_tuple,
+            "file": (upload_name, audio_bytes, mime_type),
             "response_format": "verbose_json",
-            "temperature": 0.0
+            "temperature": 0.0,
         }
 
-        # If user explicitly requested a specific language (not auto)
         if language and language.lower() not in ("auto", "none", ""):
             whisper_params["language"] = language.lower()
 
+        print("[3] Sending audio to Groq Whisper...")
+
         try:
             transcription = client.audio.transcriptions.create(**whisper_params)
-        except Exception as e_turbo:
-            print(f"[WARN] whisper-large-v3-turbo attempt: {e_turbo}, falling back to whisper-large-v3", file=sys.stderr)
+        except Exception as first_error:
+            # Keep the fallback because it helps if the Turbo model is
+            # temporarily unavailable for an account/region.
+            print(
+                f"[WARN] whisper-large-v3-turbo failed: {first_error}",
+                file=sys.stderr,
+            )
             whisper_params["model"] = "whisper-large-v3"
+            print("[3] Retrying once with whisper-large-v3...", file=sys.stderr)
             transcription = client.audio.transcriptions.create(**whisper_params)
 
-        transcript_text = getattr(transcription, "text", "") or ""
-        transcript_text = transcript_text.strip()
+        transcript_text = (getattr(transcription, "text", "") or "").strip()
 
         if not transcript_text:
-            print("[WARN] Whisper returned empty transcription text.", file=sys.stderr)
+            raise RuntimeError(
+                "Groq Whisper returned an empty transcript. "
+                "Please record clear speech and try again."
+            )
 
-        # Detect spoken language from Whisper verbose_json
         detected_lang = getattr(transcription, "language", None)
-        if not detected_lang:
-            # Fallback to Unicode script detection on the transcript text
-            detected_lang, _ = detect_script_from_text(transcript_text)
+
+        if detected_lang:
+            detected_lang = str(detected_lang).lower().strip()
         else:
-            detected_lang = detected_lang.lower().strip()
+            detected_lang, _ = detect_script_from_text(transcript_text)
+            detected_lang = str(detected_lang or "en").lower().strip()
 
-        duration = getattr(transcription, "duration", 0.0) or 0.0
+        duration = float(getattr(transcription, "duration", 0.0) or 0.0)
 
-        # Calculate average confidence if segment data exists
         confidence = 0.95
         segments = getattr(transcription, "segments", None)
-        if segments and isinstance(segments, list) and len(segments) > 0:
+
+        if segments:
             avg_logprobs = []
-            for seg in segments:
-                if isinstance(seg, dict) and "avg_logprob" in seg:
-                    avg_logprobs.append(seg["avg_logprob"])
-                elif hasattr(seg, "avg_logprob"):
-                    avg_logprobs.append(seg.avg_logprob)
+
+            for segment in segments:
+                if isinstance(segment, dict):
+                    value = segment.get("avg_logprob")
+                else:
+                    value = getattr(segment, "avg_logprob", None)
+
+                if value is not None:
+                    try:
+                        avg_logprobs.append(float(value))
+                    except (TypeError, ValueError):
+                        pass
+
             if avg_logprobs:
                 mean_logprob = sum(avg_logprobs) / len(avg_logprobs)
-                confidence = round(min(1.0, max(0.0, math.exp(mean_logprob))), 2)
+                confidence = round(
+                    min(1.0, max(0.0, math.exp(mean_logprob))), 2
+                )
 
-        word_count = len(transcript_text.split()) if transcript_text else 0
+        word_count = len(transcript_text.split())
 
         result = {
             "text": transcript_text,
@@ -156,60 +204,51 @@ def transcribe_audio(wav_path, language="auto"):
             "language_name": get_language_name(detected_lang),
             "duration": round(duration, 1),
             "confidence": confidence,
-            "word_count": word_count
+            "word_count": word_count,
         }
 
-        print(f"[3] Transcription completed: Detected Language = {result['language_name']} ({result['language_code']}), Confidence = {int(confidence*100)}%")
+        print(
+            f"[4] Completed: {result['language_name']} "
+            f"({result['language_code']}), "
+            f"{word_count} words, {result['duration']} seconds"
+        )
+
         return result
 
     except Exception as e:
-        print(f"[ERROR] Groq Whisper transcription failed: {e}", file=sys.stderr)
-        return None
+        message = f"Groq Whisper transcription failed: {type(e).__name__}: {e}"
+        print(f"[ERROR] {message}", file=sys.stderr)
+        raise RuntimeError(message) from e
 
 
 def main():
     print("===== MULTILINGUAL SPEECH TO TEXT STARTED =====")
-    wav_path = os.path.join(MEETINGS_DIR, "meeting.wav")
 
-    # Check if a custom language code was passed as command-line arg
-    lang_arg = sys.argv[1] if len(sys.argv) > 1 else "auto"
+    audio_path = os.path.join(MEETINGS_DIR, "meeting.wav")
+    language = sys.argv[1] if len(sys.argv) > 1 else "auto"
 
-    result = transcribe_audio(wav_path, language=lang_arg)
+    result = transcribe_audio(audio_path, language=language)
 
-    if result is None:
-        print("[ERROR] Transcription failed", file=sys.stderr)
-        sys.exit(1)
+    with open(TRANSCRIPT_PATH, "w", encoding="utf-8") as f:
+        f.write(result["text"])
 
-    transcript_text = result["text"]
-
-    # Save original transcript to meetings/transcript.txt
-    try:
-        with open(TRANSCRIPT_PATH, "w", encoding="utf-8") as f:
-            f.write(transcript_text)
-        print(f"[4] Original transcript saved to: {TRANSCRIPT_PATH}")
-    except Exception as e:
-        print(f"[ERROR] Failed to save transcript: {e}", file=sys.stderr)
-        sys.exit(1)
-
-    # Save state
-    save_meeting_state({
-        "original_transcript": transcript_text,
-        "detected_language": result["language_code"],
-        "detected_language_name": result["language_name"],
-        "transcription_confidence": result["confidence"],
-        "duration": result["duration"],
-        "word_count": result["word_count"]
-    })
+    save_meeting_state(
+        {
+            "original_transcript": result["text"],
+            "detected_language": result["language_code"],
+            "detected_language_name": result["language_name"],
+            "transcription_confidence": result["confidence"],
+            "duration": result["duration"],
+            "word_count": result["word_count"],
+        }
+    )
 
     print("===== SPEECH TO TEXT COMPLETED =====")
     print(f"Language: {result['language_name']}")
     print(f"Words: {result['word_count']}, Duration: {result['duration']}s")
     print("\n--- ORIGINAL TRANSCRIPT ---")
-    try:
-        print(transcript_text)
-    except UnicodeEncodeError:
-        print(transcript_text.encode("utf-8", errors="replace").decode("utf-8", errors="replace"))
-    print("---------------------------\n")
+    print(result["text"])
+    print("---------------------------")
 
 
 if __name__ == "__main__":

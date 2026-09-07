@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}Email Drafting & Prioritization Assistant | Smart Meeting Recorder{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-badge">Module 5</div>
+    <h1>Email Drafting & Prioritization Assistant</h1>
+    <p>Automatically classify meeting urgency, detect priority, and draft executive follow-up emails in your chosen language.</p>
+</div>
+
+<!-- Meeting Priority Assessment Banner -->
+<div class="priority-banner-card" id="priority-banner">
+    <div class="priority-badge-wrapper">
+        <span class="priority-pill priority-medium" id="email-priority-pill">
+            <i class="fa-solid fa-flag"></i> <span id="email-priority-label">Priority: Checking...</span>
+        </span>
+    </div>
+    <div class="priority-details">
+        <h3 id="email-priority-title">AI Meeting Priority Analysis</h3>
+        <p id="email-priority-reason">Load a meeting or transcribe audio to detect action urgency and delivery priorities.</p>
+    </div>
+</div>
+
+<div class="module-card">
+    <div class="card-action-bar">
+        <div class="status-box">
+            <span class="label">Draft Language:</span>
+            <select id="email-language-select" class="lang-select-md">
+                <option value="en" selected>English</option>
+                <option value="same">Same as Meeting Language</option>
+                <option value="te">తెలుగు (Telugu)</option>
+                <option value="hi">हिन्दी (Hindi)</option>
+                <option value="ta">தமிழ் (Tamil)</option>
+                <option value="kn">ಕನ್ನಡ (Kannada)</option>
+                <option value="ml">മലയാളം (Malayalam)</option>
+                <option value="bn">বাংলা (Bengali)</option>
+                <option value="es">Español (Spanish)</option>
+                <option value="fr">Français (French)</option>
+                <option value="de">Deutsch (German)</option>
+                <option value="ar">العربية (Arabic)</option>
+            </select>
+        </div>
+
+        <button id="btn-generate-email" class="btn btn-primary btn-md">
+            <i class="fa-solid fa-envelope-circle-check"></i> Draft Follow-Up Email
+        </button>
+    </div>
+
+    <!-- Alert Notification -->
+    <div id="email-alert" class="alert alert-info hidden">
+        <i class="fa-solid fa-circle-info"></i>
+        <span id="email-alert-text">Click "Draft Follow-Up Email" to craft a personalized briefing.</span>
+    </div>
+
+    <!-- Email Drafting Form Container -->
+    <div class="email-composer-card">
+        <div class="composer-header">
+            <div class="composer-title">
+                <i class="fa-solid fa-envelope-open-text"></i> Executive Follow-Up Email Draft
+            </div>
+            <div class="composer-quick-actions">
+                <button id="btn-copy-email" class="btn btn-outline btn-xs" title="Copy email text">
+                    <i class="fa-solid fa-copy"></i> Copy Email
+                </button>
+                <a id="btn-mailto-email" href="#" class="btn btn-outline btn-xs" title="Open in default mail client">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Send via Email Client
+                </a>
+                <a href="{{ url_for('download_email') }}" class="btn btn-outline btn-xs" title="Download as text file">
+                    <i class="fa-solid fa-download"></i> Download TXT
+                </a>
+            </div>
+        </div>
+
+        <div class="composer-body">
+            <!-- Subject Line -->
+            <div class="composer-field">
+                <label for="email-subject-input"><b>Subject:</b></label>
+                <input type="text" id="email-subject-input" class="form-input-lg" placeholder="Subject line will be generated automatically..." />
+            </div>
+
+            <!-- Suggested Recipients -->
+            <div class="composer-field">
+                <label for="email-recipients-input"><b>To / Stakeholders:</b></label>
+                <input type="text" id="email-recipients-input" class="form-input-md" placeholder="Attendees mentioned in transcript..." />
+            </div>
+
+            <!-- Email Body -->
+            <div class="composer-field">
+                <label for="email-body-textarea"><b>Email Body:</b></label>
+                <textarea id="email-body-textarea" class="large-textbox email-textbox" rows="14" placeholder="Follow-up email draft with greeting, highlights, action item assignments, and closing will appear here..."></textarea>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-footer-flex">
+        <a href="{{ url_for('summary_page') }}" class="btn btn-secondary btn-sm">
+            <i class="fa-solid fa-arrow-left"></i> Back to Summary & Actions
+        </a>
+        <a href="{{ url_for('report_page') }}" class="btn btn-primary btn-sm">
+            Proceed to Unicode PDF Report <i class="fa-solid fa-arrow-right"></i>
+        </a>
+    </div>
+</div>
+{% endblock %}

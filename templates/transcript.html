@@ -1,12 +1,30 @@
 {% extends "base.html" %}
 
-{% block title %}Speech To Text | Smart Meeting Recorder{% endblock %}
+{% block title %}Multilingual Transcript & Translation | Smart Meeting Recorder{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <div class="header-badge">Module 2</div>
-    <h1>Speech to Text Transcription</h1>
-    <p>Convert audio from <code>meetings/meeting.wav</code> into accurate written text using OpenAI Whisper</p>
+    <div class="header-badge">Module 2 & 3</div>
+    <h1>Multilingual Speech-to-Text & AI Translation</h1>
+    <p>Convert spoken audio into original native text (Telugu, Hindi, Tamil, English, etc.) and translate on-demand without losing the original transcript.</p>
+</div>
+
+<!-- Meeting Language & Detection Status Card -->
+<div class="lang-status-banner">
+    <div class="lang-status-item">
+        <span class="lang-meta-label">Spoken Meeting Language:</span>
+        <strong class="lang-meta-val" id="transcript-detected-lang">Auto Detect</strong>
+    </div>
+    <div class="lang-status-divider"></div>
+    <div class="lang-status-item">
+        <span class="lang-meta-label">Whisper Model Accuracy:</span>
+        <strong class="lang-meta-val" id="transcript-confidence-val">95% High Fidelity</strong>
+    </div>
+    <div class="lang-status-divider"></div>
+    <div class="lang-status-item">
+        <span class="lang-meta-label">Word Count:</span>
+        <strong class="lang-meta-val" id="transcript-word-count">0 words</strong>
+    </div>
 </div>
 
 <div class="module-card">
@@ -18,32 +36,101 @@
             </span>
         </div>
 
-        <button id="btn-convert-stt" class="btn btn-primary btn-md">
-            <i class="fa-solid fa-wand-magic-sparkles"></i> Convert Speech To Text
-        </button>
+        <div class="action-btn-cluster">
+            <select id="stt-lang-select" class="lang-select-md">
+                <option value="auto">🌐 Auto Detect Language</option>
+                <option value="te">తెలుగు (Telugu)</option>
+                <option value="hi">हिन्दी (Hindi)</option>
+                <option value="ta">தமிழ் (Tamil)</option>
+                <option value="kn">ಕನ್ನಡ (Kannada)</option>
+                <option value="ml">മലയാളം (Malayalam)</option>
+                <option value="bn">বাংলা (Bengali)</option>
+                <option value="mr">मराठी (Marathi)</option>
+                <option value="gu">ગુજરાતી (Gujarati)</option>
+                <option value="pa">ਪੰਜਾਬੀ (Punjabi)</option>
+                <option value="ur">اردو (Urdu)</option>
+                <option value="en">English</option>
+                <option value="es">Español (Spanish)</option>
+                <option value="fr">Français (French)</option>
+                <option value="de">Deutsch (German)</option>
+                <option value="ar">العربية (Arabic)</option>
+            </select>
+
+            <button id="btn-convert-stt" class="btn btn-primary btn-md">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Transcribe Audio
+            </button>
+        </div>
     </div>
 
     <!-- Alert status -->
     <div id="stt-alert" class="alert alert-info hidden">
         <i class="fa-solid fa-circle-info"></i>
-        <span id="stt-alert-text">Click "Convert Speech To Text" to execute <code>speech_to_text.py</code>.</span>
+        <span id="stt-alert-text">Click "Transcribe Audio" to execute Groq Whisper speech recognition.</span>
     </div>
 
-    <!-- Large Transcript Text Box -->
-    <div class="transcript-box-wrapper">
-        <div class="box-header">
-            <div class="box-title">
-                <i class="fa-solid fa-align-left"></i> Meeting Transcript Text
+    <!-- Side-by-Side Dual-Pane Transcript & Translation Layout -->
+    <div class="dual-transcript-grid">
+        <!-- Left Pane: Original Language Transcript -->
+        <div class="transcript-pane original-pane">
+            <div class="box-header">
+                <div class="box-title">
+                    <i class="fa-solid fa-file-lines"></i> Original Transcript <span class="badge-lang-tag" id="badge-orig-lang">Original Script</span>
+                </div>
+                <div class="box-actions">
+                    <button id="btn-copy-transcript" class="btn btn-outline btn-xs" title="Copy Text">
+                        <i class="fa-solid fa-copy"></i> Copy
+                    </button>
+                    <a href="{{ url_for('download_transcript') }}" class="btn btn-outline btn-xs" title="Download Text">
+                        <i class="fa-solid fa-download"></i> TXT
+                    </a>
+                </div>
             </div>
-            <div class="box-actions">
-                <button id="btn-copy-transcript" class="btn btn-outline btn-xs" title="Copy Text">
-                    <i class="fa-solid fa-copy"></i> Copy
-                </button>
-                <span class="file-tag">Saved to meetings/transcript.txt</span>
-            </div>
+
+            <textarea id="transcript-textarea" class="large-textbox" placeholder="Original language transcript (Telugu, Hindi, Tamil, English, etc.) will appear here..." readonly></textarea>
+            <div class="pane-footer-note">Preserves exact spoken language script and timestamps.</div>
         </div>
 
-        <textarea id="transcript-textarea" class="large-textbox" placeholder="Transcript will appear here after speech-to-text processing..." readonly></textarea>
+        <!-- Right Pane: AI Context Translation -->
+        <div class="transcript-pane translated-pane" id="translate-box">
+            <div class="box-header">
+                <div class="box-title">
+                    <i class="fa-solid fa-language"></i> Translated Transcript <span class="badge-lang-tag badge-cyan" id="badge-trans-lang">English</span>
+                </div>
+                <div class="box-actions">
+                    <button id="btn-copy-translated" class="btn btn-outline btn-xs" title="Copy Translated">
+                        <i class="fa-solid fa-copy"></i> Copy
+                    </button>
+                    <a href="{{ url_for('download_translated') }}" class="btn btn-outline btn-xs" title="Download Translated Text">
+                        <i class="fa-solid fa-download"></i> TXT
+                    </a>
+                </div>
+            </div>
+
+            <!-- Translation Control Toolbar -->
+            <div class="translation-controls-subbar">
+                <span class="subbar-label">Translate To:</span>
+                <select id="transcript-target-lang" class="lang-select-sm">
+                    <option value="en" selected>English</option>
+                    <option value="te">తెలుగు (Telugu)</option>
+                    <option value="hi">हिन्दी (Hindi)</option>
+                    <option value="ta">தமிழ் (Tamil)</option>
+                    <option value="kn">ಕನ್ನಡ (Kannada)</option>
+                    <option value="ml">മലയാളം (Malayalam)</option>
+                    <option value="bn">বাংলা (Bengali)</option>
+                    <option value="mr">मराठी (Marathi)</option>
+                    <option value="es">Español</option>
+                    <option value="fr">Français</option>
+                    <option value="de">Deutsch</option>
+                    <option value="ar">العربية</option>
+                </select>
+                <button id="btn-run-translation" class="btn btn-accent btn-sm">
+                    <i class="fa-solid fa-arrow-right-arrow-left"></i> Translate Now
+                </button>
+            </div>
+
+            <textarea id="translated-textarea" class="large-textbox" placeholder="Click 'Translate Now' to convert the meeting transcript into English or any selected language..." readonly></textarea>
+            <div class="pane-footer-note">Retains meeting semantics, technical terminology, and speaker nuances.</div>
+        </div>
     </div>
 
     <div class="card-footer-flex">
@@ -51,7 +138,7 @@
             <i class="fa-solid fa-arrow-left"></i> Back to Audio Recording
         </a>
         <a href="{{ url_for('summary_page') }}" class="btn btn-primary btn-sm">
-            Proceed to Summarization <i class="fa-solid fa-arrow-right"></i>
+            Proceed to Summarization & Actions <i class="fa-solid fa-arrow-right"></i>
         </a>
     </div>
 </div>

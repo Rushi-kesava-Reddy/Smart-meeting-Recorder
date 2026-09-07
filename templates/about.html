@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}About | Smart Meeting Recorder using Generative AI{% endblock %}
+{% block title %}About | Multilingual AI Smart Meeting Recorder{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <div class="header-badge">Project Information</div>
-    <h1>About Final Year Project</h1>
-    <p>Comprehensive overview of system architecture, technology stack, and objectives</p>
+    <div class="header-badge">Project Information & Documentation</div>
+    <h1>About Multilingual AI Smart Meeting Recorder</h1>
+    <p>Comprehensive overview of system architecture, technology stack, and multilingual intelligence features.</p>
 </div>
 
 <div class="about-grid">
@@ -15,14 +15,20 @@
         <div class="card-header-icon">
             <i class="fa-solid fa-graduation-cap"></i>
         </div>
-        <h2>Project Title</h2>
-        <p class="title-highlight">Smart Meeting Recorder using Generative AI</p>
+        <h2>Project Overview</h2>
+        <p class="title-highlight">Multilingual AI Smart Meeting Recorder & Intelligent Meeting Assistant</p>
 
-        <h3>Developer Name</h3>
-        <p class="developer-name">Senior Full Stack Developer (Final Year Project)</p>
+        <h3>Purpose & Scope</h3>
+        <p>A production-ready meeting intelligence web application engineered to eliminate language barriers in corporate, educational, and cross-cultural team meetings. It provides native-script preservation for Indian languages (Telugu, Hindi, Tamil, Kannada, Malayalam, Bengali, etc.), on-demand translation, executive summarization, action item extraction, priority-based email drafting, and Unicode PDF report generation.</p>
 
-        <h3>Project Objective</h3>
-        <p>Develop a modern, web-based intelligence system that records meeting conversations, automatically transcribes speech into text using deep learning, generates executive summaries via generative AI models, and compiles structured downloadable PDF report documents.</p>
+        <h3>Key Capabilities</h3>
+        <ul class="about-bullet-list">
+            <li><strong>Zero Language Assumptions:</strong> Automatically detects spoken language without forcing English transcription.</li>
+            <li><strong>Dual-Track Translation:</strong> Keeps original transcript intact while offering side-by-side translation.</li>
+            <li><strong>Action Item Extraction:</strong> Automatically isolates tasks, owners, deadlines, and urgency ratings.</li>
+            <li><strong>Email Assistant:</strong> Automatically assigns Priority tiers (Urgent, High, Medium, Low) and crafts follow-ups.</li>
+            <li><strong>Flawless Unicode PDF:</strong> Embedded Google Noto TrueType fonts ensure zero broken glyph boxes (<code>□□□</code>) on Render.</li>
+        </ul>
     </div>
 
     <!-- Tech Stack Card -->
@@ -30,61 +36,80 @@
         <div class="card-header-icon">
             <i class="fa-solid fa-layer-group"></i>
         </div>
-        <h2>Technologies Used</h2>
+        <h2>Technologies & Cloud Architecture</h2>
         
         <div class="tech-group">
-            <h4>Frontend Stack</h4>
+            <h4>Frontend Architecture</h4>
             <div class="tech-pills">
-                <span class="pill"><i class="fa-brands fa-html5"></i> HTML5</span>
-                <span class="pill"><i class="fa-brands fa-css3-alt"></i> CSS3 (Vanilla)</span>
+                <span class="pill"><i class="fa-brands fa-html5"></i> HTML5 Semantic</span>
+                <span class="pill"><i class="fa-brands fa-css3-alt"></i> Modern Vanilla CSS</span>
                 <span class="pill"><i class="fa-brands fa-js"></i> JavaScript (ES6+)</span>
-                <span class="pill"><i class="fa-solid fa-wave-square"></i> Web Audio API</span>
+                <span class="pill"><i class="fa-solid fa-wave-square"></i> Web Audio API Canvas</span>
             </div>
         </div>
 
         <div class="tech-group">
-            <h4>Backend Framework</h4>
+            <h4>Backend Web Server</h4>
             <div class="tech-pills">
-                <span class="pill"><i class="fa-brands fa-python"></i> Python 3.x</span>
-                <span class="pill"><i class="fa-solid fa-server"></i> Flask Web Server</span>
+                <span class="pill"><i class="fa-brands fa-python"></i> Python 3.10+</span>
+                <span class="pill"><i class="fa-solid fa-server"></i> Flask WSGI</span>
+                <span class="pill"><i class="fa-solid fa-rocket"></i> Gunicorn WSGI Production</span>
             </div>
         </div>
 
         <div class="tech-group">
-            <h4>AI & Machine Learning Libraries</h4>
+            <h4>AI & Multilingual Engines</h4>
             <div class="tech-pills">
-                <span class="pill"><i class="fa-solid fa-microphone"></i> sounddevice</span>
-                <span class="pill"><i class="fa-solid fa-square-root-variable"></i> scipy</span>
-                <span class="pill"><i class="fa-solid fa-brain"></i> OpenAI Whisper</span>
-                <span class="pill"><i class="fa-solid fa-robot"></i> Hugging Face Transformers</span>
-                <span class="pill"><i class="fa-solid fa-file-pdf"></i> ReportLab</span>
+                <span class="pill"><i class="fa-solid fa-microphone"></i> Groq Whisper (Large-v3)</span>
+                <span class="pill"><i class="fa-solid fa-brain"></i> OpenAI GPT-OSS / Qwen LLM</span>
+                <span class="pill"><i class="fa-solid fa-language"></i> Contextual Multilingual Translator</span>
+                <span class="pill"><i class="fa-solid fa-file-pdf"></i> ReportLab 5.0 + Google Noto TTF</span>
+            </div>
+        </div>
+
+        <div class="tech-group">
+            <h4>Cloud Deployment (Render)</h4>
+            <div class="tech-pills">
+                <span class="pill"><i class="fa-solid fa-cloud"></i> Render Cloud Web Service</span>
+                <span class="pill"><i class="fa-solid fa-gauge-high"></i> &lt; 90 MB RAM Footprint</span>
+                <span class="pill"><i class="fa-solid fa-shield-halved"></i> Zero Hardcoded Secrets</span>
             </div>
         </div>
     </div>
 </div>
 
 <div class="info-card full-width">
-    <h2>Interconnected Modules Architecture</h2>
+    <h2>Six-Stage Interconnected Intelligence Pipeline</h2>
     <div class="modules-overview-grid">
         <div class="mini-module">
             <div class="num">01</div>
-            <h4>Module 1: Audio Recording</h4>
-            <p>Captures real-time microphone stream, visualizes audio frequencies, and exports standardized WAV format to <code>meetings/meeting.wav</code>.</p>
+            <h4>Audio Recording</h4>
+            <p>Captures live browser microphone audio with real-time waveform visualization, saved to <code>meetings/meeting.wav</code>.</p>
         </div>
         <div class="mini-module">
             <div class="num">02</div>
-            <h4>Module 2: Speech to Text</h4>
-            <p>Invokes <code>speech_to_text.py</code> using OpenAI Whisper neural net to transcribe audio into text saved in <code>meetings/transcript.txt</code>.</p>
+            <h4>Multilingual Speech-to-Text</h4>
+            <p>Groq Whisper auto-detects spoken languages and transcribes native text into <code>meetings/transcript.txt</code>.</p>
         </div>
         <div class="mini-module">
             <div class="num">03</div>
-            <h4>Module 3: Meeting Summarization</h4>
-            <p>Invokes <code>summarizer.py</code> to condense transcripts into executive summaries stored in <code>meetings/summary.txt</code>.</p>
+            <h4>AI Translation Engine</h4>
+            <p>Translates full transcripts into English or other languages, saved to <code>meetings/translated_transcript.txt</code>.</p>
         </div>
         <div class="mini-module">
             <div class="num">04</div>
-            <h4>Module 4: PDF Report Generation</h4>
-            <p>Invokes <code>report_generator.py</code> using ReportLab to build structured PDF reports saved in <code>meetings/Meeting_Report.pdf</code>.</p>
+            <h4>Summarization & Actions</h4>
+            <p>Condenses discussions into 7 executive sections and structured action item tables in <code>meetings/summary.txt</code>.</p>
+        </div>
+        <div class="mini-module">
+            <div class="num">05</div>
+            <h4>Email Drafting Assistant</h4>
+            <p>Evaluates urgency, assigns Priority tags, and drafts follow-up emails in <code>meetings/email_draft.txt</code>.</p>
+        </div>
+        <div class="mini-module">
+            <div class="num">06</div>
+            <h4>Unicode PDF Engine</h4>
+            <p>Compiles intelligence into print-ready Unicode PDFs with Google Noto fonts at <code>meetings/Meeting_Report.pdf</code>.</p>
         </div>
     </div>
 </div>

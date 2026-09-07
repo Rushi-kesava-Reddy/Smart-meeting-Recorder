@@ -1,35 +1,61 @@
 {% extends "base.html" %}
 
-{% block title %}PDF Report Generation | Smart Meeting Recorder{% endblock %}
+{% block title %}Unicode PDF Report Generation | Smart Meeting Recorder{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <div class="header-badge">Module 4</div>
-    <h1>PDF Report Generation</h1>
-    <p>Compile meeting transcript and executive AI summary into a print-ready PDF report using ReportLab</p>
+    <div class="header-badge">Module 6</div>
+    <h1>Unicode PDF Report Generation</h1>
+    <p>Compile meeting transcript, executive summary, action items table, and decisions into a print-ready Unicode PDF with embedded Google Noto fonts.</p>
 </div>
 
 <div class="module-card">
-    <div class="card-action-bar">
+    <div class="card-action-bar" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
         <div class="status-box">
-            <span class="label">Inputs Ready:</span>
-            <span id="report-inputs-status" class="status-tag tag-wait">
-                <i class="fa-solid fa-layer-group"></i> Checking transcript.txt & summary.txt...
-            </span>
+            <span class="label"><i class="fa-solid fa-language"></i> Report Language & Format:</span>
+            <select id="report-lang-select" class="lang-select-md" style="min-width: 320px;">
+                <option value="en" selected>English (Recommended - Clear Executive Report for Viva & Submission)</option>
+                <option value="bilingual">Bilingual (English Executive Briefing + Regional Translation)</option>
+                <option value="same">Same as Spoken Meeting Audio</option>
+                <option value="te">తెలుగు (Telugu - Native Script)</option>
+                <option value="hi">हिन्दी (Hindi - Native Script)</option>
+                <option value="ta">தமிழ் (Tamil - Native Script)</option>
+                <option value="kn">ಕನ್ನಡ (Kannada - Native Script)</option>
+                <option value="ml">മലയാളം (Malayalam - Native Script)</option>
+                <option value="bn">বাংলা (Bengali - Native Script)</option>
+                <option value="mr">मराठी (Marathi - Native Script)</option>
+                <option value="es">Español (Spanish)</option>
+                <option value="fr">Français (French)</option>
+                <option value="de">Deutsch (German)</option>
+                <option value="ar">العربية (Arabic)</option>
+            </select>
         </div>
 
-        <button id="btn-generate-pdf" class="btn btn-primary btn-md">
-            <i class="fa-solid fa-file-pdf"></i> Generate PDF Report
-        </button>
+        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <button id="btn-generate-pdf" class="btn btn-primary btn-md">
+                <i class="fa-solid fa-file-pdf"></i> Generate PDF
+            </button>
+            <a id="btn-top-download" href="/download/Meeting_Report.pdf" class="btn btn-success btn-md" download="Meeting_Report.pdf">
+                <i class="fa-solid fa-download"></i> Download PDF
+            </a>
+            <a id="btn-top-view" href="/view/Meeting_Report.pdf" target="_blank" class="btn btn-outline btn-md">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i> Open in Tab
+            </a>
+        </div>
     </div>
 
     <!-- Success / Error Alert Banner -->
-    <div id="report-success-alert" class="alert alert-success hidden">
-        <i class="fa-solid fa-circle-check"></i>
-        <div>
-            <strong>Report Generated Successfully</strong>
-            <p>Your PDF meeting report <code>Meeting_Report.pdf</code> has been created and is ready for download.</p>
+    <div id="report-success-alert" class="alert alert-success hidden" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <i class="fa-solid fa-circle-check" style="font-size: 1.4rem;"></i>
+            <div>
+                <strong>Unicode PDF Report Generated Successfully!</strong>
+                <p style="margin: 0; font-size: 0.9rem;">Your document <code>Meeting_Report.pdf</code> is ready.</p>
+            </div>
         </div>
+        <a id="btn-alert-download" href="/download/Meeting_Report.pdf" class="btn btn-primary btn-sm" download="Meeting_Report.pdf">
+            <i class="fa-solid fa-download"></i> Download Meeting_Report.pdf
+        </a>
     </div>
 
     <div id="report-error-alert" class="alert alert-danger hidden">
@@ -37,33 +63,55 @@
         <span id="report-error-text">An error occurred during PDF generation.</span>
     </div>
 
+    <!-- Unicode Font Integration Status Card -->
+    <div class="font-status-strip">
+        <div class="font-status-info">
+            <i class="fa-solid fa-shield-halved text-success"></i>
+            <div>
+                <strong>Unicode TrueType Font Engine Verified</strong>
+                <span>Bundled Google Noto fonts (Telugu, Devanagari, Tamil, Kannada, Bengali, Latin) ensure clean rendering without broken boxes on Render Linux deployment.</span>
+            </div>
+        </div>
+        <span class="badge badge-success"><i class="fa-solid fa-check"></i> 10 Fonts Active</span>
+    </div>
+
     <!-- PDF Report Preview & Download Card -->
     <div class="pdf-preview-card">
         <div class="pdf-card-header">
             <div class="pdf-card-title">
-                <i class="fa-solid fa-file-lines"></i> Meeting_Report.pdf Document
+                <i class="fa-solid fa-file-lines"></i> Meeting_Report.pdf Document Specifications
             </div>
-            <span class="pdf-badge">PDF / ReportLab</span>
+            <span class="pdf-badge">ReportLab 5.0 / Google Noto TTF</span>
         </div>
 
         <div class="pdf-card-body">
             <div class="pdf-icon-display">
                 <i class="fa-solid fa-file-pdf"></i>
-                <h3>SMART MEETING RECORDER REPORT</h3>
-                <p>Includes complete timestamped transcript and AI summary briefing.</p>
+                <h3>SMART MEETING REPORT</h3>
+                <p>Complete documentation with meeting metadata, executive briefing, decisions list, action item table, and full transcript.</p>
             </div>
 
-            <div class="download-action-box">
-                <a id="btn-download-pdf" href="{{ url_for('download_pdf') }}" class="btn btn-success btn-lg disabled" download>
-                    <i class="fa-solid fa-download"></i> Download PDF
+            <div class="pdf-features-list">
+                <div class="feat-item"><i class="fa-solid fa-check text-success"></i> Native Script Rendering (తెలుగు, हिन्दी, தமிழ், English)</div>
+                <div class="feat-item"><i class="fa-solid fa-check text-success"></i> Executive Metadata Block & Date Stamp</div>
+                <div class="feat-item"><i class="fa-solid fa-check text-success"></i> Action Items Table with Assignees & Priority Colors</div>
+                <div class="feat-item"><i class="fa-solid fa-check text-success"></i> Running Numbered Canvas ("Page X of Y" Footers)</div>
+            </div>
+
+            <div class="download-action-box" style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+                <a id="btn-download-pdf" href="/download/Meeting_Report.pdf" class="btn btn-success btn-lg disabled" download="Meeting_Report.pdf">
+                    <i class="fa-solid fa-download"></i> Download Meeting_Report.pdf
+                </a>
+                <a id="btn-view-pdf" href="/view/Meeting_Report.pdf" target="_blank" class="btn btn-outline btn-lg disabled">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Open PDF in Browser
                 </a>
             </div>
         </div>
     </div>
 
     <div class="card-footer-flex">
-        <a href="{{ url_for('summary_page') }}" class="btn btn-secondary btn-sm">
-            <i class="fa-solid fa-arrow-left"></i> Back to Summary
+        <a href="{{ url_for('email_page') }}" class="btn btn-secondary btn-sm">
+            <i class="fa-solid fa-arrow-left"></i> Back to Email Assistant
         </a>
         <a href="{{ url_for('index') }}" class="btn btn-outline btn-sm">
             <i class="fa-solid fa-house"></i> Return to Dashboard

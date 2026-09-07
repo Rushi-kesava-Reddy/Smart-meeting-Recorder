@@ -1,47 +1,107 @@
 {% extends "base.html" %}
 
-{% block title %}Meeting Summarization | Smart Meeting Recorder{% endblock %}
+{% block title %}Meeting Summarization & Action Items | Smart Meeting Recorder{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <div class="header-badge">Module 3</div>
-    <h1>Meeting Summarization</h1>
-    <p>Distill long meeting transcripts into executive AI summaries using Transformer algorithms</p>
+    <div class="header-badge">Module 4</div>
+    <h1>Multilingual Summarization & Action Extraction</h1>
+    <p>Distill long meeting discussions into structured executive briefings, key decisions, and actionable deliverables in any selected language.</p>
 </div>
 
 <div class="module-card">
     <div class="card-action-bar">
         <div class="status-box">
-            <span class="label">Transcript Source:</span>
-            <span id="transcript-file-status" class="status-tag tag-wait">
-                <i class="fa-solid fa-file-lines"></i> Checking meetings/transcript.txt...
-            </span>
+            <span class="label">Summary Language:</span>
+            <select id="summary-lang-select" class="lang-select-md">
+                <option value="same" selected>Same as Meeting Language</option>
+                <option value="en">English</option>
+                <option value="te">తెలుగు (Telugu)</option>
+                <option value="hi">हिन्दी (Hindi)</option>
+                <option value="ta">தமிழ் (Tamil)</option>
+                <option value="kn">ಕನ್ನಡ (Kannada)</option>
+                <option value="ml">മലയാളം (Malayalam)</option>
+                <option value="bn">বাংলা (Bengali)</option>
+                <option value="mr">मराठी (Marathi)</option>
+                <option value="es">Español (Spanish)</option>
+                <option value="fr">Français (French)</option>
+                <option value="de">Deutsch (German)</option>
+                <option value="ar">العربية (Arabic)</option>
+            </select>
         </div>
 
         <button id="btn-generate-summary" class="btn btn-accent btn-md">
-            <i class="fa-solid fa-brain"></i> Generate Summary
+            <i class="fa-solid fa-brain"></i> Generate Multilingual Summary
         </button>
     </div>
 
     <!-- Alert status -->
     <div id="summary-alert" class="alert alert-info hidden">
         <i class="fa-solid fa-circle-info"></i>
-        <span id="summary-alert-text">Click "Generate Summary" to execute <code>summarizer.py</code>.</span>
+        <span id="summary-alert-text">Click "Generate Multilingual Summary" to execute summarizer.py.</span>
     </div>
 
     <!-- Executive Summary Card Container -->
     <div class="summary-display-card">
         <div class="summary-card-header">
             <div class="summary-title">
-                <i class="fa-solid fa-square-poll-vertical"></i> Executive AI Meeting Summary
+                <i class="fa-solid fa-square-poll-vertical"></i> Executive Meeting Briefing
+                <span class="badge-lang-tag" id="summary-language-tag">Meeting Language</span>
             </div>
-            <span class="save-path-tag">meetings/summary.txt</span>
+            <div class="box-actions">
+                <button id="btn-copy-summary" class="btn btn-outline btn-xs" title="Copy Summary">
+                    <i class="fa-solid fa-copy"></i> Copy
+                </button>
+                <a href="{{ url_for('download_summary') }}" class="btn btn-outline btn-xs" title="Download Summary">
+                    <i class="fa-solid fa-download"></i> TXT
+                </a>
+            </div>
         </div>
 
         <div class="summary-card-body">
             <div id="summary-content" class="summary-text-box">
-                <p class="placeholder-text">Click "Generate Summary" above to process transcript text into concise executive bullet points.</p>
+                <p class="placeholder-text">Click "Generate Multilingual Summary" above to process transcript text into structured executive bullet points.</p>
             </div>
+        </div>
+    </div>
+
+    <!-- Structured Action Items & Decisions Section -->
+    <div class="action-items-section">
+        <div class="action-header-row">
+            <div class="action-section-title">
+                <i class="fa-solid fa-list-check"></i> Extracted Action Items & Deliverables
+            </div>
+            <span class="action-count-pill" id="action-count-pill">0 items</span>
+        </div>
+
+        <div class="table-responsive">
+            <table class="action-items-table" id="action-items-table">
+                <thead>
+                    <tr>
+                        <th style="width: 50px;">#</th>
+                        <th>Action Task</th>
+                        <th style="width: 160px;">Assigned To</th>
+                        <th style="width: 140px;">Deadline</th>
+                        <th style="width: 110px;">Priority</th>
+                        <th style="width: 110px;">Status</th>
+                    </tr>
+                </thead>
+                <tbody id="action-items-tbody">
+                    <tr>
+                        <td colspan="6" class="table-placeholder">
+                            Action items will appear in tabular format once summary is generated.
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Decisions List Card -->
+        <div class="decisions-card">
+            <h4><i class="fa-solid fa-circle-check"></i> Key Decisions Agreed Upon:</h4>
+            <ul id="decisions-list" class="decisions-list">
+                <li class="placeholder-li">No decisions extracted yet.</li>
+            </ul>
         </div>
     </div>
 
@@ -49,8 +109,8 @@
         <a href="{{ url_for('transcript_page') }}" class="btn btn-secondary btn-sm">
             <i class="fa-solid fa-arrow-left"></i> Back to Transcript
         </a>
-        <a href="{{ url_for('report_page') }}" class="btn btn-primary btn-sm">
-            Proceed to PDF Report <i class="fa-solid fa-arrow-right"></i>
+        <a href="{{ url_for('email_page') }}" class="btn btn-primary btn-sm">
+            Proceed to Email Assistant <i class="fa-solid fa-arrow-right"></i>
         </a>
     </div>
 </div>

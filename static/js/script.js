@@ -1,11 +1,12 @@
 /**
- * Smart Meeting Recorder using Generative AI - Client Application Script
- * Frontend Web Audio Recording, Canvas Visualization, REST API Integration & UI State Management
+ * Multilingual AI Smart Meeting Recorder & Intelligent Assistant - Client Application
+ * Frontend Web Audio, Multilingual STT, Translation, Summarization, Email Drafting,
+ * Action Item Rendering, Unicode PDF Engine, and College Demo Mode Orchestration.
  */
 
 document.addEventListener('DOMContentLoaded', () => {
     // =========================================================================
-    // GLOBAL STATE & DOM ELEMENTS
+    // STATE & DOM REFERENCES
     // =========================================================================
     let mediaRecorder = null;
     let audioChunks = [];
@@ -15,22 +16,43 @@ document.addEventListener('DOMContentLoaded', () => {
     let animationFrameId = null;
     let recordingStartTime = 0;
     let timerInterval = null;
+    let sttPollInterval = null;
 
-    // DOM Elements - Navigation & Layout
+    // Layout & Navigation
     const sidebarToggleBtn = document.getElementById('sidebar-toggle');
     const sidebar = document.querySelector('.sidebar');
     const toastContainer = document.getElementById('toast-container');
     const loadingSpinner = document.getElementById('loading-spinner');
     const spinnerTitle = document.getElementById('spinner-title');
     const spinnerDesc = document.getElementById('spinner-desc');
+    const headerDetectedLang = document.getElementById('header-detected-lang');
 
-    // DOM Elements - Status Badges
+    // Artifact Status Badges
     const badgeAudio = document.getElementById('badge-audio');
     const badgeTranscript = document.getElementById('badge-transcript');
     const badgeSummary = document.getElementById('badge-summary');
+    const badgeEmail = document.getElementById('badge-email');
     const badgePdf = document.getElementById('badge-pdf');
 
-    // DOM Elements - Audio Recorder (Module 1)
+    // Dashboard Metrics
+    const metricLanguage = document.getElementById('metric-language');
+    const metricDuration = document.getElementById('metric-duration');
+    const metricWords = document.getElementById('metric-words');
+    const metricActions = document.getElementById('metric-actions');
+    const metricPriority = document.getElementById('metric-priority');
+
+    // Global Language Toolbar Selectors
+    const globalSpeechLang = document.getElementById('global-speech-lang');
+    const globalTransLang = document.getElementById('global-trans-lang');
+    const globalSummaryLang = document.getElementById('global-summary-lang');
+
+    // Demo Modal Elements
+    const demoModal = document.getElementById('demo-modal');
+    const btnOpenDemoModal = document.getElementById('btn-open-demo-modal');
+    const btnCloseDemoModal = document.getElementById('btn-close-demo-modal');
+    const btnResetSession = document.getElementById('btn-reset-session');
+
+    // Module 1: Audio Recorder
     const btnStartRecord = document.getElementById('btn-start-record');
     const btnStopRecord = document.getElementById('btn-stop-record');
     const waveformCanvas = document.getElementById('waveform-canvas');
@@ -43,32 +65,61 @@ document.addEventListener('DOMContentLoaded', () => {
     const uploadForm = document.getElementById('upload-form');
     const audioFileInput = document.getElementById('audio-file-input');
 
-    // DOM Elements - Speech To Text (Module 2)
+    // Module 2 & 3: Speech to Text & Translation
+    const sttLangSelect = document.getElementById('stt-lang-select');
     const btnConvertStt = document.getElementById('btn-convert-stt');
+    const btnQuickTranscribe = document.getElementById('btn-quick-transcribe');
     const transcriptTextarea = document.getElementById('transcript-textarea');
+    const translatedTextarea = document.getElementById('translated-textarea');
     const btnCopyTranscript = document.getElementById('btn-copy-transcript');
+    const btnCopyTranslated = document.getElementById('btn-copy-translated');
+    const transcriptTargetLang = document.getElementById('transcript-target-lang');
+    const btnRunTranslation = document.getElementById('btn-run-translation');
     const sttAlert = document.getElementById('stt-alert');
     const sttAlertText = document.getElementById('stt-alert-text');
     const audioFileStatus = document.getElementById('audio-file-status');
-    const btnQuickTranscribe = document.getElementById('btn-quick-transcribe');
+    const transcriptDetectedLang = document.getElementById('transcript-detected-lang');
+    const transcriptConfidenceVal = document.getElementById('transcript-confidence-val');
+    const transcriptWordCount = document.getElementById('transcript-word-count');
+    const badgeOrigLang = document.getElementById('badge-orig-lang');
+    const badgeTransLang = document.getElementById('badge-trans-lang');
 
-    // DOM Elements - Summarizer (Module 3)
+    // Module 4: Summarization & Action Extraction
+    const summaryLangSelect = document.getElementById('summary-lang-select');
     const btnGenerateSummary = document.getElementById('btn-generate-summary');
     const summaryContent = document.getElementById('summary-content');
     const summaryAlert = document.getElementById('summary-alert');
     const summaryAlertText = document.getElementById('summary-alert-text');
-    const transcriptFileStatus = document.getElementById('transcript-file-status');
+    const summaryLanguageTag = document.getElementById('summary-language-tag');
+    const btnCopySummary = document.getElementById('btn-copy-summary');
+    const actionItemsTbody = document.getElementById('action-items-tbody');
+    const actionCountPill = document.getElementById('action-count-pill');
+    const decisionsList = document.getElementById('decisions-list');
 
-    // DOM Elements - PDF Report (Module 4)
+    // Module 5: Email Drafting Assistant
+    const emailLanguageSelect = document.getElementById('email-language-select');
+    const btnGenerateEmail = document.getElementById('btn-generate-email');
+    const emailPriorityPill = document.getElementById('email-priority-pill');
+    const emailPriorityLabel = document.getElementById('email-priority-label');
+    const emailPriorityReason = document.getElementById('email-priority-reason');
+    const emailSubjectInput = document.getElementById('email-subject-input');
+    const emailRecipientsInput = document.getElementById('email-recipients-input');
+    const emailBodyTextarea = document.getElementById('email-body-textarea');
+    const btnCopyEmail = document.getElementById('btn-copy-email');
+    const btnMailtoEmail = document.getElementById('btn-mailto-email');
+    const emailAlert = document.getElementById('email-alert');
+    const emailAlertText = document.getElementById('email-alert-text');
+
+    // Module 6: Unicode PDF Report
+    const reportLangSelect = document.getElementById('report-lang-select');
     const btnGeneratePdf = document.getElementById('btn-generate-pdf');
     const btnDownloadPdf = document.getElementById('btn-download-pdf');
     const reportSuccessAlert = document.getElementById('report-success-alert');
     const reportErrorAlert = document.getElementById('report-error-alert');
     const reportErrorText = document.getElementById('report-error-text');
-    const reportInputsStatus = document.getElementById('report-inputs-status');
 
     // =========================================================================
-    // INITIALIZATION & ARTIFACT STATUS CHECK
+    // INITIALIZATION & EVENT BINDINGS
     // =========================================================================
     fetchSystemStatus();
 
@@ -78,15 +129,66 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Canvas setup if canvas exists
+    // Canvas visualizer setup
     let canvasCtx = null;
     if (waveformCanvas) {
         canvasCtx = waveformCanvas.getContext('2d');
         drawIdleWaveform(canvasCtx, waveformCanvas.width, waveformCanvas.height);
     }
 
+    // Bind demo buttons
+    bindDemoButtons();
+
+    // Bind global toolbar synchronization
+    if (globalSpeechLang && sttLangSelect) {
+        globalSpeechLang.addEventListener('change', () => {
+            sttLangSelect.value = globalSpeechLang.value;
+        });
+        sttLangSelect.addEventListener('change', () => {
+            globalSpeechLang.value = sttLangSelect.value;
+        });
+    }
+
+    if (globalTransLang && transcriptTargetLang) {
+        globalTransLang.addEventListener('change', () => {
+            transcriptTargetLang.value = globalTransLang.value;
+        });
+        transcriptTargetLang.addEventListener('change', () => {
+            globalTransLang.value = transcriptTargetLang.value;
+        });
+    }
+
+    if (globalSummaryLang && summaryLangSelect) {
+        globalSummaryLang.addEventListener('change', () => {
+            summaryLangSelect.value = globalSummaryLang.value;
+            if (reportLangSelect) reportLangSelect.value = globalSummaryLang.value;
+        });
+    }
+
+    // Demo Modal handlers
+    if (btnOpenDemoModal && demoModal) {
+        btnOpenDemoModal.addEventListener('click', () => demoModal.classList.remove('hidden'));
+    }
+    if (btnCloseDemoModal && demoModal) {
+        btnCloseDemoModal.addEventListener('click', () => demoModal.classList.add('hidden'));
+    }
+    if (demoModal) {
+        demoModal.addEventListener('click', (e) => {
+            if (e.target === demoModal) demoModal.classList.add('hidden');
+        });
+    }
+
+    // Reset Session Button
+    if (btnResetSession) {
+        btnResetSession.addEventListener('click', async () => {
+            if (confirm("Reset current meeting session and clear all recorded artifacts?")) {
+                await resetMeetingSession();
+            }
+        });
+    }
+
     // =========================================================================
-    // SYSTEM STATUS & STEP TRACKER
+    // SYSTEM STATUS & METRIC UPDATER
     // =========================================================================
     async function fetchSystemStatus() {
         try {
@@ -96,18 +198,84 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             updateArtifactBadges(data);
             updateWorkflowStepper(data);
+            updateMetrics(data);
 
-            // Update transcript textarea if available
+            // Update Header Detected Language Pill
+            if (headerDetectedLang) {
+                headerDetectedLang.textContent = data.has_transcript ? data.detected_language_name : 'Auto Detect';
+            }
+
+            // Module 2: Transcript updates
             if (transcriptTextarea && data.transcript) {
                 transcriptTextarea.value = data.transcript;
             }
+            if (translatedTextarea && data.translated_transcript) {
+                translatedTextarea.value = data.translated_transcript;
+            }
+            if (transcriptDetectedLang) {
+                transcriptDetectedLang.textContent = data.detected_language_name || 'Auto Detect';
+            }
+            if (transcriptConfidenceVal) {
+                const confPercent = Math.round((data.transcription_confidence || 0.95) * 100);
+                transcriptConfidenceVal.textContent = `${confPercent}% Confidence`;
+            }
+            if (transcriptWordCount) {
+                transcriptWordCount.textContent = `${data.word_count || 0} words`;
+            }
+            if (badgeOrigLang) {
+                badgeOrigLang.textContent = data.detected_language_name || 'Original Script';
+            }
+            if (badgeTransLang && data.translation_language_name) {
+                badgeTransLang.textContent = data.translation_language_name;
+            }
 
-            // Update summary card if available
+            // Module 3: Summary updates
             if (summaryContent && data.summary) {
                 summaryContent.innerHTML = formatSummaryText(data.summary);
             }
+            if (summaryLanguageTag && data.summary_language) {
+                summaryLanguageTag.textContent = data.summary_language === 'same'
+                    ? (data.detected_language_name || 'Meeting Language')
+                    : (data.summary_language_name || data.summary_language);
+            }
 
-            // Module status tags
+            // Action Items & Decisions
+            renderActionItems(data.action_items || []);
+            renderDecisions(data.decisions || []);
+
+            // Module 5: Email Draft updates
+            if (data.email_draft && data.email_draft.body) {
+                renderEmailDraft(data.email_draft);
+            }
+
+            // Module 6: PDF download status
+            const btnViewPdf = document.getElementById('btn-view-pdf');
+            const btnTopDownload = document.getElementById('btn-top-download');
+            const btnTopView = document.getElementById('btn-top-view');
+            const btnAlertDownload = document.getElementById('btn-alert-download');
+
+            const allDownloadBtns = [btnDownloadPdf, btnTopDownload, btnAlertDownload].filter(Boolean);
+            const allViewBtns = [btnViewPdf, btnTopView].filter(Boolean);
+
+            if (data.has_pdf) {
+                allDownloadBtns.forEach(btn => {
+                    btn.classList.remove('disabled');
+                    btn.removeAttribute('disabled');
+                    btn.setAttribute('href', '/download/Meeting_Report.pdf');
+                    btn.setAttribute('download', 'Meeting_Report.pdf');
+                });
+                allViewBtns.forEach(btn => {
+                    btn.classList.remove('disabled');
+                    btn.removeAttribute('disabled');
+                    btn.setAttribute('href', '/view/Meeting_Report.pdf');
+                });
+                if (reportSuccessAlert) reportSuccessAlert.classList.remove('hidden');
+            } else {
+                allDownloadBtns.forEach(btn => btn.classList.add('disabled'));
+                allViewBtns.forEach(btn => btn.classList.add('disabled'));
+            }
+
+            // Audio tag status
             if (audioFileStatus) {
                 audioFileStatus.className = data.has_audio ? 'status-tag tag-ready' : 'status-tag tag-wait';
                 audioFileStatus.innerHTML = data.has_audio
@@ -115,41 +283,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     : '<i class="fa-solid fa-clock"></i> Awaiting meetings/meeting.wav';
             }
 
-            if (transcriptFileStatus) {
-                transcriptFileStatus.className = data.has_transcript ? 'status-tag tag-ready' : 'status-tag tag-wait';
-                transcriptFileStatus.innerHTML = data.has_transcript
-                    ? '<i class="fa-solid fa-circle-check"></i> meetings/transcript.txt Ready'
-                    : '<i class="fa-solid fa-clock"></i> Awaiting meetings/transcript.txt';
-            }
-
-            if (reportInputsStatus) {
-                const inputsReady = data.has_transcript && data.has_summary;
-                reportInputsStatus.className = inputsReady ? 'status-tag tag-ready' : 'status-tag tag-wait';
-                reportInputsStatus.innerHTML = inputsReady
-                    ? '<i class="fa-solid fa-circle-check"></i> Transcript & Summary Ready'
-                    : '<i class="fa-solid fa-clock"></i> Transcript/Summary Missing';
-            }
-
-            if (btnDownloadPdf) {
-                if (data.has_pdf) {
-                    btnDownloadPdf.classList.remove('disabled');
-                    btnDownloadPdf.removeAttribute('disabled');
-                    if (reportSuccessAlert) reportSuccessAlert.classList.remove('hidden');
-                } else {
-                    btnDownloadPdf.classList.add('disabled');
-                }
-            }
-
-            // Module page meta status tags
+            // Module Page status tags
             const mod1Status = document.getElementById('mod1-status');
             const mod2Status = document.getElementById('mod2-status');
             const mod3Status = document.getElementById('mod3-status');
             const mod4Status = document.getElementById('mod4-status');
+            const mod5Status = document.getElementById('mod5-status');
+            const mod6Status = document.getElementById('mod6-status');
 
             if (mod1Status) mod1Status.innerHTML = data.has_audio ? '<span class="text-success">Available</span>' : 'Not Recorded';
-            if (mod2Status) mod2Status.innerHTML = data.has_transcript ? '<span class="text-success">Transcribed</span>' : 'Not Generated';
-            if (mod3Status) mod3Status.innerHTML = data.has_summary ? '<span class="text-success">Summarized</span>' : 'Not Generated';
-            if (mod4Status) mod4Status.innerHTML = data.has_pdf ? '<span class="text-success">PDF Ready</span>' : 'Not Created';
+            if (mod2Status) mod2Status.innerHTML = data.has_transcript ? `<span class="text-success">${data.detected_language_name}</span>` : 'Not Transcribed';
+            if (mod3Status) mod3Status.innerHTML = data.has_translation ? '<span class="text-success">Translated</span>' : 'Optional';
+            if (mod4Status) mod4Status.innerHTML = data.has_summary ? '<span class="text-success">Summarized</span>' : 'Not Generated';
+            if (mod5Status) mod5Status.innerHTML = data.has_email ? '<span class="text-success">Drafted</span>' : 'Not Drafted';
+            if (mod6Status) mod6Status.innerHTML = data.has_pdf ? '<span class="text-success">Unicode PDF Ready</span>' : 'Not Created';
 
         } catch (err) {
             console.error('Error fetching system status:', err);
@@ -157,18 +304,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateArtifactBadges(data) {
-        if (badgeAudio) {
-            badgeAudio.className = data.has_audio ? 'badge badge-success' : 'badge badge-neutral';
-        }
-        if (badgeTranscript) {
-            badgeTranscript.className = data.has_transcript ? 'badge badge-success' : 'badge badge-neutral';
-        }
-        if (badgeSummary) {
-            badgeSummary.className = data.has_summary ? 'badge badge-success' : 'badge badge-neutral';
-        }
-        if (badgePdf) {
-            badgePdf.className = data.has_pdf ? 'badge badge-success' : 'badge badge-neutral';
-        }
+        if (badgeAudio) badgeAudio.className = data.has_audio ? 'badge badge-success' : 'badge badge-neutral';
+        if (badgeTranscript) badgeTranscript.className = data.has_transcript ? 'badge badge-success' : 'badge badge-neutral';
+        if (badgeSummary) badgeSummary.className = data.has_summary ? 'badge badge-success' : 'badge badge-neutral';
+        if (badgeEmail) badgeEmail.className = data.has_email ? 'badge badge-success' : 'badge badge-neutral';
+        if (badgePdf) badgePdf.className = data.has_pdf ? 'badge badge-success' : 'badge badge-neutral';
     }
 
     function updateWorkflowStepper(data) {
@@ -177,169 +317,157 @@ document.addEventListener('DOMContentLoaded', () => {
         const step3 = document.getElementById('step-3');
         const step4 = document.getElementById('step-4');
         const step5 = document.getElementById('step-5');
+        const step6 = document.getElementById('step-6');
 
         if (step1) step1.classList.toggle('active', true);
-        if (step2) step2.classList.toggle('active', data.has_audio);
-        if (step3) step3.classList.toggle('active', data.has_transcript);
+        if (step2) step2.classList.toggle('active', data.has_audio || data.has_transcript);
+        if (step3) step3.classList.toggle('active', data.has_translation);
         if (step4) step4.classList.toggle('active', data.has_summary);
-        if (step5) step5.classList.toggle('active', data.has_pdf);
+        if (step5) step5.classList.toggle('active', data.has_email);
+        if (step6) step6.classList.toggle('active', data.has_pdf);
     }
 
-    // =========================================================================
-    // MODULE 1: AUDIO RECORDING (BROWSER MICROPHONE & WEBAUDIO)
-    // =========================================================================
-    if (btnStartRecord) {
-        btnStartRecord.addEventListener('click', startMicrophoneRecording);
-    }
-
-    if (btnStopRecord) {
-        btnStopRecord.addEventListener('click', stopMicrophoneRecording);
-    }
-
-    if (uploadForm) {
-        uploadForm.addEventListener('submit', handleFileUpload);
-    }
-
-    function getAudioMediaStream() {
-        if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
-            return navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    function updateMetrics(data) {
+        if (metricLanguage) {
+            metricLanguage.textContent = data.has_transcript ? data.detected_language_name : 'Auto Detect';
         }
+        if (metricDuration) {
+            const secs = Math.round(data.duration || 0);
+            const m = String(Math.floor(secs / 60)).padStart(2, '0');
+            const s = String(secs % 60).padStart(2, '0');
+            metricDuration.textContent = `${m}:${s}`;
+        }
+        if (metricWords) {
+            metricWords.textContent = data.word_count || 0;
+        }
+        if (metricActions) {
+            const actionsCount = (data.action_items && data.action_items.length) || 0;
+            metricActions.textContent = actionsCount;
+        }
+        if (metricPriority) {
+            const draft = data.email_draft || {};
+            metricPriority.textContent = draft.priority || 'Normal';
+        }
+    }
 
-        const legacyGetUserMedia = navigator.getUserMedia ||
-                                   navigator.webkitGetUserMedia ||
-                                   navigator.mozGetUserMedia ||
-                                   navigator.msGetUserMedia;
-
-        if (legacyGetUserMedia) {
-            return new Promise((resolve, reject) => {
-                legacyGetUserMedia.call(navigator, { audio: true, video: false }, resolve, reject);
+    // =========================================================================
+    // COLLEGE DEMO SCENARIO LOADER
+    // =========================================================================
+    function bindDemoButtons() {
+        const demoButtons = document.querySelectorAll('.btn-load-scenario');
+        demoButtons.forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const scenarioId = btn.getAttribute('data-id');
+                await loadDemoScenario(scenarioId);
+                if (demoModal) demoModal.classList.add('hidden');
             });
+        });
+    }
+
+    async function loadDemoScenario(scenarioId) {
+        showSpinner('Loading Demonstration Meeting...', 'Populating multilingual transcript, executive summary, action items, email draft, and generating Unicode PDF report.');
+
+        try {
+            const response = await fetch('/api/load_demo', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ scenario_id: scenarioId })
+            });
+
+            const result = await response.json();
+            hideSpinner();
+
+            if (response.ok && result.status === 'success') {
+                showToast(`Loaded ${result.scenario.title}!`, 'success');
+                await fetchSystemStatus();
+            } else {
+                showToast(result.message || 'Failed to load demo scenario', 'error');
+            }
+        } catch (err) {
+            hideSpinner();
+            showToast('Demo loading error: ' + err.message, 'error');
         }
-
-        return Promise.reject(new Error(
-            "Microphone API (navigator.mediaDevices.getUserMedia) is not supported or security context blocked it. Access via http://127.0.0.1:5000 or HTTPS."
-        ));
     }
 
-    function resetRecordingUI() {
-        if (btnStartRecord) btnStartRecord.disabled = false;
-        if (btnStopRecord) btnStopRecord.disabled = true;
-        if (recStatusPill) recStatusPill.className = 'rec-status-pill';
-        if (recStatusLabel) recStatusLabel.textContent = 'Ready';
-        if (timerInterval) clearInterval(timerInterval);
-        if (recordingTimer) recordingTimer.textContent = '00:00';
-    }
-
-    function handleMicrophoneError(err) {
-        let userMsg = '';
-        const errName = err ? (err.name || '') : '';
-        const errMsg = err ? (err.message || '') : '';
-
-        if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError') {
-            userMsg = 'Microphone permission was denied. Please click the lock icon in your browser address bar to allow microphone access.';
-        } else if (errName === 'NotFoundError' || errName === 'DevicesNotFoundError') {
-            userMsg = 'No microphone hardware found. Please connect a microphone and try again.';
-        } else if (errName === 'NotReadableError' || errName === 'TrackStartError') {
-            userMsg = 'Microphone is currently in use by another application (e.g. Zoom, Teams, Discord). Please close other apps and retry.';
-        } else if (errName === 'SecurityError') {
-            userMsg = 'Microphone access blocked due to insecure HTTP context. Open via http://127.0.0.1:5000, http://localhost:5000, or HTTPS.';
-        } else if (errName === 'AbortError') {
-            userMsg = 'Microphone recording request was aborted.';
-        } else {
-            userMsg = 'Microphone error: ' + (errMsg || errName || 'Permission denied or browser unsupported.');
+    async function resetMeetingSession() {
+        showSpinner('Resetting Meeting Session...', 'Clearing audio and generated meeting artifacts.');
+        try {
+            const res = await fetch('/api/reset', { method: 'POST' });
+            hideSpinner();
+            if (res.ok) {
+                showToast('Meeting session reset successfully.', 'info');
+                setTimeout(() => window.location.reload(), 600);
+            }
+        } catch (e) {
+            hideSpinner();
+            showToast('Reset failed: ' + e.message, 'error');
         }
-
-        showMicrophoneError(userMsg);
     }
 
-    function showMicrophoneError(msg) {
-        if (recordingErrorAlert && recordingErrorText) {
-            recordingErrorText.textContent = msg;
-            recordingErrorAlert.classList.remove('hidden');
-        }
-        showToast(msg, 'error');
-    }
+    // =========================================================================
+    // MODULE 1: BROWSER AUDIO RECORDING & UPLOAD
+    // =========================================================================
+    if (btnStartRecord) btnStartRecord.addEventListener('click', startMicrophoneRecording);
+    if (btnStopRecord) btnStopRecord.addEventListener('click', stopMicrophoneRecording);
+    if (uploadForm) uploadForm.addEventListener('submit', handleFileUpload);
 
     async function startMicrophoneRecording() {
-        console.log("Microphone request started");
-
         if (recordingSuccessAlert) recordingSuccessAlert.classList.add('hidden');
         if (recordingErrorAlert) recordingErrorAlert.classList.add('hidden');
 
-        if (!navigator.mediaDevices && !navigator.getUserMedia && !navigator.webkitGetUserMedia && !navigator.mozGetUserMedia) {
-            const msg = "Browser does not support mediaDevices.getUserMedia or security context blocked it. Access via http://127.0.0.1:5000 or HTTPS.";
-            console.error(msg);
-            showMicrophoneError(msg);
-            resetRecordingUI();
-            return;
-        }
-
         try {
             audioChunks = [];
-            microphoneStream = await getAudioMediaStream();
-            console.log("Microphone permission granted");
+            microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
 
-            // Initialize AudioContext & Analyser for Canvas Animation
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
             analyser = audioContext.createAnalyser();
             analyser.fftSize = 256;
             const source = audioContext.createMediaStreamSource(microphoneStream);
             source.connect(analyser);
 
-            let mimeType = '';
+            let mimeType = 'audio/webm';
             if (window.MediaRecorder) {
-                if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-                    mimeType = 'audio/webm;codecs=opus';
-                } else if (MediaRecorder.isTypeSupported('audio/webm')) {
-                    mimeType = 'audio/webm';
-                } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
-                    mimeType = 'audio/mp4';
-                } else if (MediaRecorder.isTypeSupported('audio/ogg')) {
-                    mimeType = 'audio/ogg';
-                }
+                if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) mimeType = 'audio/webm;codecs=opus';
+                else if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
             }
 
-            const recorderOptions = mimeType ? { mimeType } : {};
-            mediaRecorder = new MediaRecorder(microphoneStream, recorderOptions);
-
+            mediaRecorder = new MediaRecorder(microphoneStream, { mimeType });
             mediaRecorder.ondataavailable = (event) => {
-                if (event.data && event.data.size > 0) {
-                    audioChunks.push(event.data);
-                }
+                if (event.data && event.data.size > 0) audioChunks.push(event.data);
             };
 
             mediaRecorder.onstop = async () => {
-                console.log("Recording stopped");
-                const finalMimeType = (mediaRecorder && mediaRecorder.mimeType) ? mediaRecorder.mimeType : 'audio/webm';
-                const audioBlob = new Blob(audioChunks, { type: finalMimeType });
-                console.log("Audio blob created", { size: audioBlob.size, type: audioBlob.type });
+                const finalMime = mediaRecorder.mimeType || 'audio/webm';
+                const audioBlob = new Blob(audioChunks, { type: finalMime });
                 await saveAudioToServer(audioBlob);
             };
 
             mediaRecorder.start(100);
-            console.log("Recording started");
 
-            // UI State Changes
             btnStartRecord.disabled = true;
             btnStopRecord.disabled = false;
             if (recStatusPill) recStatusPill.className = 'rec-status-pill recording';
-            if (recStatusLabel) recStatusLabel.textContent = 'Recording Live...';
+            if (recStatusLabel) recStatusLabel.textContent = 'Recording Live Speech...';
 
-            // Start Timer
             recordingStartTime = Date.now();
             updateTimerDisplay();
             timerInterval = setInterval(updateTimerDisplay, 1000);
 
-            // Start Waveform Canvas Animation
             if (canvasCtx && waveformCanvas) {
                 visualizeLiveWaveform(canvasCtx, waveformCanvas.width, waveformCanvas.height);
             }
 
-            showToast('Microphone recording started.', 'info');
+            showToast('Microphone recording started. Speak naturally in any language.', 'info');
         } catch (err) {
-            console.error('Microphone access error:', err);
-            resetRecordingUI();
-            handleMicrophoneError(err);
+            console.error('Microphone error:', err);
+            btnStartRecord.disabled = false;
+            btnStopRecord.disabled = true;
+            const msg = 'Microphone access error: ' + (err.message || 'Permission denied.');
+            if (recordingErrorAlert && recordingErrorText) {
+                recordingErrorText.textContent = msg;
+                recordingErrorAlert.classList.remove('hidden');
+            }
+            showToast(msg, 'error');
         }
     }
 
@@ -347,67 +475,49 @@ document.addEventListener('DOMContentLoaded', () => {
         if (mediaRecorder && mediaRecorder.state !== 'inactive') {
             mediaRecorder.stop();
         }
-
-        // Stop Microphone Streams
         if (microphoneStream) {
             microphoneStream.getTracks().forEach(track => track.stop());
         }
-
-        // Stop Timer
         clearInterval(timerInterval);
-
-        // Cancel Canvas Animation
-        if (animationFrameId) {
-            cancelAnimationFrame(animationFrameId);
-        }
+        if (animationFrameId) cancelAnimationFrame(animationFrameId);
 
         if (canvasCtx && waveformCanvas) {
             drawIdleWaveform(canvasCtx, waveformCanvas.width, waveformCanvas.height);
         }
 
-        // Reset UI Buttons
         btnStartRecord.disabled = false;
         btnStopRecord.disabled = true;
         if (recStatusPill) recStatusPill.className = 'rec-status-pill';
-        if (recStatusLabel) recStatusLabel.textContent = 'Ready';
+        if (recStatusLabel) recStatusLabel.textContent = 'Processing Audio...';
     }
 
     async function saveAudioToServer(blob) {
-        console.log("Upload started");
-        showSpinner('Saving Audio Recording...', 'Uploading microphone recording to meetings/meeting.wav');
+        showSpinner('Saving Audio Recording...', 'Uploading microphone audio to meetings/meeting.wav');
         try {
             const formData = new FormData();
             formData.append('audio_file', blob, 'meeting.wav');
 
-            const response = await fetch('/api/save_audio', {
-                method: 'POST',
-                body: formData
-            });
-
-            const result = await response.json();
+            const res = await fetch('/api/save_audio', { method: 'POST', body: formData });
+            const result = await res.json();
             hideSpinner();
 
-            if (response.ok && result.status === 'success') {
-                console.log("Upload completed");
+            if (res.ok && result.status === 'success') {
                 if (recordingSuccessAlert) recordingSuccessAlert.classList.remove('hidden');
-                showToast('Recording Completed Successfully', 'success');
+                showToast('Audio recording saved successfully!', 'success');
                 fetchSystemStatus();
             } else {
-                console.error("Upload failed:", result.message);
-                showMicrophoneError(result.message || 'Failed to save audio recording.');
+                showToast(result.message || 'Failed to save audio recording', 'error');
             }
         } catch (err) {
             hideSpinner();
-            console.error('Error saving audio to server:', err);
-            showMicrophoneError('Network error saving audio: ' + err.message);
+            showToast('Error saving audio: ' + err.message, 'error');
         }
     }
-
 
     async function handleFileUpload(e) {
         e.preventDefault();
         if (!audioFileInput || !audioFileInput.files[0]) {
-            showToast('Please select a WAV audio file first.', 'error');
+            showToast('Please select an audio file first.', 'error');
             return;
         }
 
@@ -416,22 +526,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             const formData = new FormData();
-            formData.append('audio_file', file, 'meeting.wav');
+            formData.append('audio_file', file, file.name);
 
-            const response = await fetch('/api/save_audio', {
-                method: 'POST',
-                body: formData
-            });
-
-            const result = await response.json();
+            const res = await fetch('/api/save_audio', { method: 'POST', body: formData });
+            const result = await res.json();
             hideSpinner();
 
-            if (response.ok && result.status === 'success') {
+            if (res.ok && result.status === 'success') {
                 if (recordingSuccessAlert) recordingSuccessAlert.classList.remove('hidden');
                 showToast('Audio uploaded and saved as meetings/meeting.wav', 'success');
                 fetchSystemStatus();
             } else {
-                showToast(result.message || 'Failed to upload audio file', 'error');
+                showToast(result.message || 'Upload failed', 'error');
             }
         } catch (err) {
             hideSpinner();
@@ -447,11 +553,9 @@ document.addEventListener('DOMContentLoaded', () => {
         recordingTimer.textContent = `${mins}:${secs}`;
     }
 
-    // Canvas Animation Functions
     function drawIdleWaveform(ctx, width, height) {
         ctx.fillStyle = '#0f172a';
         ctx.fillRect(0, 0, width, height);
-
         ctx.strokeStyle = '#3b82f6';
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -462,7 +566,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function visualizeLiveWaveform(ctx, width, height) {
         if (!analyser) return;
-
         const bufferLength = analyser.frequencyBinCount;
         const dataArray = new Uint8Array(bufferLength);
 
@@ -483,30 +586,21 @@ document.addEventListener('DOMContentLoaded', () => {
             for (let i = 0; i < bufferLength; i++) {
                 const v = dataArray[i] / 128.0;
                 const y = v * height / 2;
-
-                if (i === 0) {
-                    ctx.moveTo(x, y);
-                } else {
-                    ctx.lineTo(x, y);
-                }
-
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
                 x += sliceWidth;
             }
 
             ctx.lineTo(width, height / 2);
             ctx.stroke();
         }
-
         draw();
     }
 
     // =========================================================================
-    // MODULE 2: SPEECH TO TEXT (OPENAI WHISPER)
+    // MODULE 2: MULTILINGUAL SPEECH TO TEXT
     // =========================================================================
-    if (btnConvertStt) {
-        btnConvertStt.addEventListener('click', runSpeechToText);
-    }
-
+    if (btnConvertStt) btnConvertStt.addEventListener('click', runSpeechToText);
     if (btnQuickTranscribe) {
         btnQuickTranscribe.addEventListener('click', async () => {
             await runSpeechToText();
@@ -518,29 +612,32 @@ document.addEventListener('DOMContentLoaded', () => {
         btnCopyTranscript.addEventListener('click', () => {
             if (transcriptTextarea && transcriptTextarea.value) {
                 navigator.clipboard.writeText(transcriptTextarea.value);
-                showToast('Transcript copied to clipboard!', 'success');
+                showToast('Original transcript copied to clipboard!', 'success');
             }
         });
     }
 
-    let sttPollInterval = null;
-
     async function runSpeechToText() {
-        showSpinner('Converting Speech to Text...', 'Executing OpenAI Whisper model on meetings/meeting.wav...');
+        const langCode = (sttLangSelect && sttLangSelect.value) || (globalSpeechLang && globalSpeechLang.value) || 'auto';
+        showSpinner('Detecting Language & Transcribing...', `Running Groq Whisper speech recognition (Language: ${langCode})...`);
 
         if (sttAlert && sttAlertText) {
             sttAlert.className = 'alert alert-info';
-            sttAlertText.textContent = 'Executing speech_to_text.py with OpenAI Whisper...';
+            sttAlertText.textContent = `Connecting to Groq Whisper in ${langCode} mode...`;
             sttAlert.classList.remove('hidden');
         }
 
         try {
-            const response = await fetch('/api/transcribe', { method: 'POST' });
-            const result = await response.json();
+            const res = await fetch('/api/transcribe', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ language: langCode })
+            });
+            const result = await res.json();
 
-            if (!response.ok || result.status === 'error') {
+            if (!res.ok || result.status === 'error') {
                 hideSpinner();
-                const errMessage = result.message || 'Speech to text conversion failed to start.';
+                const errMessage = result.message || 'Speech to text conversion failed.';
                 if (sttAlert && sttAlertText) {
                     sttAlert.className = 'alert alert-danger';
                     sttAlertText.textContent = errMessage;
@@ -550,49 +647,76 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // Start polling status until transcription finishes or errors out
-            startSttPolling();
+            // Direct fast-path: transcript returned immediately
+            if (result.transcript) {
+                hideSpinner();
+                if (transcriptTextarea) transcriptTextarea.value = result.transcript;
+                if (transcriptDetectedLang) transcriptDetectedLang.textContent = result.detected_language_name || 'Detected';
+                if (headerDetectedLang) headerDetectedLang.textContent = result.detected_language_name || 'Detected';
+                if (badgeOrigLang) badgeOrigLang.textContent = result.detected_language_name || 'Original Script';
+                if (transcriptConfidenceVal) {
+                    const confPercent = Math.round((result.transcription_confidence || 0.95) * 100);
+                    transcriptConfidenceVal.textContent = `${confPercent}% Confidence`;
+                }
+                if (transcriptWordCount) {
+                    transcriptWordCount.textContent = `${result.word_count || 0} words`;
+                }
 
+                if (sttAlert && sttAlertText) {
+                    sttAlert.className = 'alert alert-success';
+                    sttAlertText.textContent = `Speech recognized successfully as ${result.detected_language_name || 'Meeting Language'}! Preserved in meetings/transcript.txt`;
+                    sttAlert.classList.remove('hidden');
+                }
+                showToast(`Spoken language detected: ${result.detected_language_name}!`, 'success');
+                fetchSystemStatus();
+                return;
+            }
+
+            startSttPolling();
         } catch (err) {
             hideSpinner();
-            console.error('Speech to text API error:', err);
-            if (sttAlert && sttAlertText) {
-                sttAlert.className = 'alert alert-danger';
-                sttAlertText.textContent = 'Network or server error: ' + err.message;
-                sttAlert.classList.remove('hidden');
-            }
-            showToast('Error calling transcription endpoint: ' + err.message, 'error');
+            showToast('Transcription API error: ' + err.message, 'error');
         }
     }
 
     function startSttPolling() {
-        if (sttPollInterval) {
-            clearInterval(sttPollInterval);
-        }
+        if (sttPollInterval) clearInterval(sttPollInterval);
+        let pollCount = 0;
 
         sttPollInterval = setInterval(async () => {
-            try {
-                const response = await fetch('/api/status');
-                if (!response.ok) return;
+            pollCount++;
+            if (pollCount > 10) {
+                clearInterval(sttPollInterval);
+                sttPollInterval = null;
+                hideSpinner();
+                fetchSystemStatus();
+                return;
+            }
 
-                const data = await response.json();
+            try {
+                const res = await fetch('/api/status');
+                if (!res.ok) return;
+
+                const data = await res.json();
                 updateArtifactBadges(data);
                 updateWorkflowStepper(data);
+                updateMetrics(data);
 
-                if (data.transcription_status === 'completed') {
+                if (data.transcription_status === 'completed' || data.has_transcript) {
                     clearInterval(sttPollInterval);
                     sttPollInterval = null;
                     hideSpinner();
 
-                    if (transcriptTextarea) {
-                        transcriptTextarea.value = data.transcript;
-                    }
+                    if (transcriptTextarea && data.transcript) transcriptTextarea.value = data.transcript;
+                    if (transcriptDetectedLang) transcriptDetectedLang.textContent = data.detected_language_name;
+                    if (headerDetectedLang) headerDetectedLang.textContent = data.detected_language_name;
+
                     if (sttAlert && sttAlertText) {
                         sttAlert.className = 'alert alert-success';
-                        sttAlertText.textContent = 'Speech converted to text successfully and saved to meetings/transcript.txt!';
+                        sttAlertText.textContent = `Speech recognized successfully as ${data.detected_language_name}! Preserved in meetings/transcript.txt`;
                         sttAlert.classList.remove('hidden');
                     }
-                    showToast('Speech To Text Completed Successfully!', 'success');
+                    showToast(`Spoken language detected: ${data.detected_language_name}!`, 'success');
                     fetchSystemStatus();
 
                 } else if (data.transcription_status === 'error') {
@@ -600,7 +724,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     sttPollInterval = null;
                     hideSpinner();
 
-                    const errorMsg = data.transcription_error || 'Transcription failed due to an error.';
+                    const errorMsg = data.transcription_error || 'Transcription failed.';
                     if (sttAlert && sttAlertText) {
                         sttAlert.className = 'alert alert-danger';
                         sttAlertText.textContent = errorMsg;
@@ -609,36 +733,97 @@ document.addEventListener('DOMContentLoaded', () => {
                     showToast(errorMsg, 'error');
                 }
             } catch (err) {
-                console.error('Error polling transcription status:', err);
+                console.error('STT polling error:', err);
             }
         }, 1500);
     }
 
+    // =========================================================================
+    // MODULE 3: CONTEXT-AWARE AI TRANSLATION
+    // =========================================================================
+    if (btnRunTranslation) {
+        btnRunTranslation.addEventListener('click', runTranslation);
+    }
+
+    if (btnCopyTranslated) {
+        btnCopyTranslated.addEventListener('click', () => {
+            if (translatedTextarea && translatedTextarea.value) {
+                navigator.clipboard.writeText(translatedTextarea.value);
+                showToast('Translated transcript copied to clipboard!', 'success');
+            }
+        });
+    }
+
+    async function runTranslation() {
+        const targetLang = (transcriptTargetLang && transcriptTargetLang.value) || 'en';
+        showSpinner('Translating Meeting Transcript...', `Translating full meeting conversation to ${targetLang} using contextual AI...`);
+
+        try {
+            const res = await fetch('/api/translate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ target_language: targetLang })
+            });
+            const result = await res.json();
+            hideSpinner();
+
+            if (res.ok && result.status === 'success') {
+                if (translatedTextarea) translatedTextarea.value = result.translated_transcript;
+                if (badgeTransLang) badgeTransLang.textContent = result.target_language_name;
+                showToast(`Transcript translated to ${result.target_language_name}!`, 'success');
+                fetchSystemStatus();
+            } else {
+                showToast(result.message || 'Translation failed.', 'error');
+            }
+        } catch (err) {
+            hideSpinner();
+            showToast('Translation error: ' + err.message, 'error');
+        }
+    }
 
     // =========================================================================
-    // MODULE 3: MEETING SUMMARIZATION (TRANSFORMERS)
+    // MODULE 4: MULTILINGUAL SUMMARIZATION & ACTION ITEMS
     // =========================================================================
     if (btnGenerateSummary) {
         btnGenerateSummary.addEventListener('click', runSummarization);
     }
 
+    if (btnCopySummary) {
+        btnCopySummary.addEventListener('click', () => {
+            const sumText = document.getElementById('summary-content')?.innerText || '';
+            if (sumText) {
+                navigator.clipboard.writeText(sumText);
+                showToast('Meeting summary copied to clipboard!', 'success');
+            }
+        });
+    }
+
     async function runSummarization() {
-        showSpinner('Generating AI Summary...', 'Executing summarizer.py to extract core highlights and decision points.');
+        const sumLang = (summaryLangSelect && summaryLangSelect.value) || 'same';
+        showSpinner('Generating Multilingual Summary & Action Items...', 'Distilling discussions into 7 structured executive sections and extracting tasks...');
+
         try {
-            const response = await fetch('/api/summarize', { method: 'POST' });
-            const result = await response.json();
+            const res = await fetch('/api/summarize', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ summary_language: sumLang })
+            });
+            const result = await res.json();
             hideSpinner();
 
-            if (response.ok && result.status === 'success') {
-                if (summaryContent) {
-                    summaryContent.innerHTML = formatSummaryText(result.summary);
-                }
+            if (res.ok && result.status === 'success') {
+                if (summaryContent) summaryContent.innerHTML = formatSummaryText(result.summary);
+                if (summaryLanguageTag) summaryLanguageTag.textContent = result.language_name;
                 if (summaryAlert && summaryAlertText) {
                     summaryAlert.className = 'alert alert-success';
-                    summaryAlertText.textContent = 'Meeting summary generated successfully and saved to meetings/summary.txt!';
+                    summaryAlertText.textContent = `Meeting summary generated successfully in ${result.language_name}!`;
                     summaryAlert.classList.remove('hidden');
                 }
-                showToast('Meeting Summary Generated Successfully!', 'success');
+
+                renderActionItems(result.action_items || []);
+                renderDecisions(result.decisions || []);
+
+                showToast(`Executive summary generated in ${result.language_name}!`, 'success');
                 fetchSystemStatus();
             } else {
                 if (summaryAlert && summaryAlertText) {
@@ -650,7 +835,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (err) {
             hideSpinner();
-            console.error('Summarization API error:', err);
             showToast('Error generating summary: ' + err.message, 'error');
         }
     }
@@ -658,60 +842,247 @@ document.addEventListener('DOMContentLoaded', () => {
     function formatSummaryText(text) {
         if (!text) return '<p class="placeholder-text">No summary content available.</p>';
         const paragraphs = text.split('\n\n');
-        return paragraphs.map(p => `<p>• ${p.replace(/\n/g, '<br>')}</p>`).join('');
+        return paragraphs.map(p => {
+            p = p.trim();
+            if (!p) return '';
+            if (/^\d+\./.test(p)) {
+                return `<h4 style="margin-top: 14px; margin-bottom: 6px; color: var(--primary);">${p}</h4>`;
+            }
+            return `<p>• ${p.replace(/\n/g, '<br>')}</p>`;
+        }).join('');
+    }
+
+    function renderActionItems(items) {
+        if (!actionItemsTbody) return;
+        if (!items || items.length === 0) {
+            actionItemsTbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="table-placeholder">
+                        No action items extracted yet. Generate summary to identify deliverables.
+                    </td>
+                </tr>
+            `;
+            if (actionCountPill) actionCountPill.textContent = '0 items';
+            return;
+        }
+
+        if (actionCountPill) actionCountPill.textContent = `${items.length} items`;
+
+        actionItemsTbody.innerHTML = items.map((item, idx) => {
+            const prio = (item.priority || 'Medium').toLowerCase();
+            const prioClass = (prio === 'high' || prio === 'urgent') ? 'prio-high' : (prio === 'medium' ? 'prio-medium' : 'prio-low');
+
+            return `
+                <tr>
+                    <td><strong>${idx + 1}</strong></td>
+                    <td><strong>${item.task || 'Task'}</strong></td>
+                    <td><i class="fa-solid fa-user" style="color: var(--secondary); margin-right: 4px;"></i> ${item.assigned_to || 'Unassigned'}</td>
+                    <td><i class="fa-solid fa-calendar-day" style="color: var(--secondary); margin-right: 4px;"></i> ${item.deadline || 'TBD'}</td>
+                    <td><span class="prio-pill ${prioClass}">${item.priority || 'Medium'}</span></td>
+                    <td><span class="status-pill-sub">${item.status || 'Pending'}</span></td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function renderDecisions(decisions) {
+        if (!decisionsList) return;
+        if (!decisions || decisions.length === 0) {
+            decisionsList.innerHTML = '<li class="placeholder-li">No decisions extracted yet.</li>';
+            return;
+        }
+        decisionsList.innerHTML = decisions.map(d => `<li><strong>${d}</strong></li>`).join('');
     }
 
     // =========================================================================
-    // MODULE 4: PDF REPORT GENERATION (REPORTLAB)
+    // MODULE 5: EMAIL DRAFTING & PRIORITIZATION ASSISTANT
+    // =========================================================================
+    if (btnGenerateEmail) {
+        btnGenerateEmail.addEventListener('click', runGenerateEmail);
+    }
+
+    if (btnCopyEmail) {
+        btnCopyEmail.addEventListener('click', () => {
+            const subj = emailSubjectInput ? emailSubjectInput.value : '';
+            const to = emailRecipientsInput ? emailRecipientsInput.value : '';
+            const body = emailBodyTextarea ? emailBodyTextarea.value : '';
+
+            const fullEmail = `Subject: ${subj}\nTo: ${to}\n\n${body}`;
+            navigator.clipboard.writeText(fullEmail);
+            showToast('Follow-up email copied to clipboard!', 'success');
+        });
+    }
+
+    async function runGenerateEmail() {
+        const emailLang = (emailLanguageSelect && emailLanguageSelect.value) || 'en';
+        showSpinner('Drafting Follow-Up Email...', `Assessing meeting urgency and crafting follow-up in ${emailLang}...`);
+
+        try {
+            const res = await fetch('/api/generate_email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email_language: emailLang })
+            });
+            const result = await res.json();
+            hideSpinner();
+
+            if (res.ok && result.status === 'success') {
+                renderEmailDraft(result.email_draft);
+                if (emailAlert && emailAlertText) {
+                    emailAlert.className = 'alert alert-success';
+                    emailAlertText.textContent = 'Follow-up email drafted with priority assessment!';
+                    emailAlert.classList.remove('hidden');
+                }
+                showToast(`Email drafted (Priority: ${result.email_draft.priority})!`, 'success');
+                fetchSystemStatus();
+            } else {
+                showToast(result.message || 'Email drafting failed.', 'error');
+            }
+        } catch (err) {
+            hideSpinner();
+            showToast('Email drafting error: ' + err.message, 'error');
+        }
+    }
+
+    function renderEmailDraft(draft) {
+        if (!draft) return;
+
+        if (emailSubjectInput) emailSubjectInput.value = draft.subject || '';
+        if (emailRecipientsInput) emailRecipientsInput.value = draft.recipients || '';
+        if (emailBodyTextarea) emailBodyTextarea.value = draft.body || '';
+
+        // Update Priority pill
+        const prio = (draft.priority || 'Medium').toLowerCase();
+        if (emailPriorityPill) {
+            emailPriorityPill.className = `priority-pill prio-${prio}`;
+        }
+        if (emailPriorityLabel) {
+            emailPriorityLabel.textContent = `Priority: ${draft.priority || 'Medium'}`;
+        }
+        if (emailPriorityReason) {
+            emailPriorityReason.textContent = draft.priority_reason || 'Standard meeting follow-up.';
+        }
+
+        // Build mailto link
+        if (btnMailtoEmail) {
+            const subjectEnc = encodeURIComponent(draft.subject || 'Meeting Follow-up');
+            const bodyEnc = encodeURIComponent(draft.body || '');
+            btnMailtoEmail.href = `mailto:?subject=${subjectEnc}&body=${bodyEnc}`;
+        }
+    }
+
+    // =========================================================================
+    // MODULE 6: UNICODE PDF REPORT GENERATION
     // =========================================================================
     if (btnGeneratePdf) {
         btnGeneratePdf.addEventListener('click', runReportGeneration);
     }
 
     async function runReportGeneration() {
-        showSpinner('Building PDF Report...', 'Executing report_generator.py using ReportLab document engine.');
+        const repLang = (reportLangSelect && reportLangSelect.value) || 'en';
+        showSpinner('Building Unicode PDF Report...', `Compiling intelligence with embedded Google Noto fonts (Format: ${repLang})...`);
+
         try {
-            const response = await fetch('/api/generate_report', { method: 'POST' });
-            const result = await response.json();
+            const res = await fetch('/api/generate_report', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ report_language: repLang })
+            });
+            const result = await res.json();
             hideSpinner();
 
-            if (response.ok && result.status === 'success') {
+            if (res.ok && result.status === 'success') {
                 if (reportSuccessAlert) reportSuccessAlert.classList.remove('hidden');
                 if (reportErrorAlert) reportErrorAlert.classList.add('hidden');
 
-                if (btnDownloadPdf) {
-                    btnDownloadPdf.classList.remove('disabled');
-                    btnDownloadPdf.removeAttribute('disabled');
-                }
+                // Enable all download & view buttons
+                const btnTopDownload = document.getElementById('btn-top-download');
+                const btnTopView = document.getElementById('btn-top-view');
+                const btnAlertDownload = document.getElementById('btn-alert-download');
+                const btnViewPdf = document.getElementById('btn-view-pdf');
 
-                showToast('Report Generated Successfully', 'success');
+                const dlBtns = [btnDownloadPdf, btnTopDownload, btnAlertDownload].filter(Boolean);
+                const viewBtns = [btnViewPdf, btnTopView].filter(Boolean);
+
+                dlBtns.forEach(btn => {
+                    btn.classList.remove('disabled');
+                    btn.removeAttribute('disabled');
+                    btn.setAttribute('href', '/download/Meeting_Report.pdf');
+                    btn.setAttribute('download', 'Meeting_Report.pdf');
+                });
+                viewBtns.forEach(btn => {
+                    btn.classList.remove('disabled');
+                    btn.removeAttribute('disabled');
+                    btn.setAttribute('href', '/view/Meeting_Report.pdf');
+                });
+
+                // Trigger automatic file download to the user's Downloads folder
+                const dlLink = document.createElement('a');
+                dlLink.href = '/download/Meeting_Report.pdf?t=' + Date.now();
+                dlLink.setAttribute('download', 'Meeting_Report.pdf');
+                document.body.appendChild(dlLink);
+                dlLink.click();
+                setTimeout(() => {
+                    if (dlLink.parentNode) dlLink.parentNode.removeChild(dlLink);
+                }, 500);
+
+                showToast('Unicode PDF Report Downloaded Successfully!', 'success');
                 fetchSystemStatus();
             } else {
                 if (reportErrorAlert && reportErrorText) {
-                    reportErrorText.textContent = result.message || 'Failed to generate PDF report.';
+                    reportErrorText.textContent = result.message || 'PDF generation failed.';
                     reportErrorAlert.classList.remove('hidden');
                 }
-                showToast(result.message || 'PDF Generation Error', 'error');
+                showToast(result.message || 'PDF generation error', 'error');
             }
         } catch (err) {
             hideSpinner();
-            console.error('PDF report API error:', err);
-            showToast('Error calling PDF report generator: ' + err.message, 'error');
+            showToast('PDF generator error: ' + err.message, 'error');
         }
     }
 
     // =========================================================================
-    // UTILITY HELPERS: SPINNER & TOAST NOTIFICATIONS
+    // UTILITIES: SPINNER & TOAST NOTIFICATIONS
     // =========================================================================
+    let spinnerWatchdogTimer = null;
+
     function showSpinner(title, desc) {
         if (spinnerTitle) spinnerTitle.textContent = title || 'Processing...';
-        if (spinnerDesc) spinnerDesc.textContent = desc || 'Please wait while the system processes request.';
+        if (spinnerDesc) spinnerDesc.textContent = desc || 'Connecting modules and analyzing meeting data.';
         if (loadingSpinner) loadingSpinner.classList.remove('hidden');
+
+        // Watchdog: auto-dismiss spinner after 15 seconds if an unhandled network freeze occurs
+        if (spinnerWatchdogTimer) clearTimeout(spinnerWatchdogTimer);
+        spinnerWatchdogTimer = setTimeout(() => {
+            if (loadingSpinner && !loadingSpinner.classList.contains('hidden')) {
+                hideSpinner();
+                showToast('Operation took longer than usual. Synchronizing meeting data...', 'info');
+                fetchSystemStatus();
+            }
+        }, 15000);
     }
 
     function hideSpinner() {
+        if (spinnerWatchdogTimer) {
+            clearTimeout(spinnerWatchdogTimer);
+            spinnerWatchdogTimer = null;
+        }
         if (loadingSpinner) loadingSpinner.classList.add('hidden');
     }
+
+    // Dismiss spinner on close button click, backdrop click, or Escape key
+    const btnCloseSpinner = document.getElementById('btn-close-spinner');
+    const btnSpinnerCancel = document.getElementById('btn-spinner-cancel');
+    if (btnCloseSpinner) btnCloseSpinner.addEventListener('click', hideSpinner);
+    if (btnSpinnerCancel) btnSpinnerCancel.addEventListener('click', hideSpinner);
+    if (loadingSpinner) {
+        loadingSpinner.addEventListener('click', (e) => {
+            if (e.target === loadingSpinner) hideSpinner();
+        });
+    }
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') hideSpinner();
+    });
 
     function showToast(message, type = 'info') {
         if (!toastContainer) return;

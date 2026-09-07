@@ -5,10 +5,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>{% block title %}Smart Meeting Recorder using Generative AI{% endblock %}</title>
+    <title>{% block title %}Multilingual AI Smart Meeting Recorder{% endblock %}</title>
 
     <meta name="description"
-          content="Modern web application that records meetings, converts speech into text, generates an AI summary, and creates a downloadable PDF meeting report.">
+          content="Multilingual AI Meeting Recorder supporting Telugu, Hindi, Tamil, English, and more with speech-to-text, translation, executive summaries, action item extraction, email drafting, and Unicode PDF reports.">
 
     <!-- Google Fonts & Font Awesome Icons -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -22,7 +22,7 @@
 
     <!-- CSS Stylesheet -->
     <link rel="stylesheet"
-          href="{{ url_for('static', filename='style.css') }}">
+          href="{{ url_for('static', filename='css/style.css') }}">
 
     {% block extra_css %}{% endblock %}
 </head>
@@ -45,7 +45,7 @@
 
                 <div class="sidebar-brand">
                     <h2>SmartRecorder</h2>
-                    <span class="badge-ai">Generative AI</span>
+                    <span class="badge-ai">Multilingual AI</span>
                 </div>
 
             </div>
@@ -58,7 +58,7 @@
                         <a href="{{ url_for('index') }}"
                            class="nav-link {% if request.endpoint == 'index' and request.path == '/' %}active{% endif %}">
                             <i class="fa-solid fa-house"></i>
-                            <span>Home</span>
+                            <span>Home Dashboard</span>
                         </a>
                     </li>
 
@@ -74,7 +74,7 @@
                         <a href="{{ url_for('transcript_page') }}"
                            class="nav-link {% if request.endpoint == 'transcript_page' %}active{% endif %}">
                             <i class="fa-solid fa-file-lines"></i>
-                            <span>Transcript</span>
+                            <span>Original Transcript</span>
                         </a>
                     </li>
 
@@ -82,7 +82,15 @@
                         <a href="{{ url_for('summary_page') }}"
                            class="nav-link {% if request.endpoint == 'summary_page' %}active{% endif %}">
                             <i class="fa-solid fa-wand-magic-sparkles"></i>
-                            <span>Summary</span>
+                            <span>AI Summary & Actions</span>
+                        </a>
+                    </li>
+
+                    <li>
+                        <a href="{{ url_for('email_page') }}"
+                           class="nav-link {% if request.endpoint == 'email_page' %}active{% endif %}">
+                            <i class="fa-solid fa-envelope-open-text"></i>
+                            <span>Email Assistant</span>
                         </a>
                     </li>
 
@@ -90,7 +98,7 @@
                         <a href="{{ url_for('report_page') }}"
                            class="nav-link {% if request.endpoint == 'report_page' %}active{% endif %}">
                             <i class="fa-solid fa-file-pdf"></i>
-                            <span>Report</span>
+                            <span>Unicode PDF Report</span>
                         </a>
                     </li>
 
@@ -100,7 +108,7 @@
                         <a href="{{ url_for('modules_page') }}"
                            class="nav-link {% if request.endpoint == 'modules_page' %}active{% endif %}">
                             <i class="fa-solid fa-cubes"></i>
-                            <span>Modules</span>
+                            <span>Architecture</span>
                         </a>
                     </li>
 
@@ -108,7 +116,7 @@
                         <a href="{{ url_for('about_page') }}"
                            class="nav-link {% if request.endpoint == 'about_page' %}active{% endif %}">
                             <i class="fa-solid fa-circle-info"></i>
-                            <span>About</span>
+                            <span>About Project</span>
                         </a>
                     </li>
 
@@ -120,11 +128,11 @@
 
                 <div class="status-indicator">
                     <span class="status-dot online"></span>
-                    <span class="status-text">Flask System Active</span>
+                    <span class="status-text">Render Cloud Ready</span>
                 </div>
 
                 <div class="version-tag">
-                    v2.0 Final Year Project
+                    v3.0 Multilingual AI
                 </div>
 
             </div>
@@ -135,7 +143,7 @@
         <!-- Main Content Area -->
         <main class="main-wrapper">
 
-            <!-- Header Bar -->
+            <!-- Top Header Bar -->
             <header class="top-header">
 
                 <div class="header-left">
@@ -147,19 +155,26 @@
                     </button>
 
                     <div class="header-title">
-
-                        <h1>Smart Meeting Recorder</h1>
-
+                        <h1>Smart Meeting Recorder <span class="header-lang-pill" id="header-detected-lang">Auto Detect</span></h1>
                         <span class="subtitle">
-                            Powered by OpenAI Whisper & Transformer Summarization
+                            Multilingual Speech-to-Text, AI Translation, Summarization & Unicode PDF Generator
                         </span>
-
                     </div>
 
                 </div>
 
 
                 <div class="header-right">
+
+                    <!-- Quick Demo Launcher Button -->
+                    <button id="btn-open-demo-modal" class="btn btn-demo-trigger btn-sm" title="College Viva Demo Scenarios">
+                        <i class="fa-solid fa-graduation-cap"></i> College Demo
+                    </button>
+
+                    <!-- Reset Meeting Button -->
+                    <button id="btn-reset-session" class="btn btn-outline btn-sm" title="Reset current session">
+                        <i class="fa-solid fa-rotate-right"></i> Reset
+                    </button>
 
                     <!-- Quick System Artifact Badges -->
                     <div class="artifact-badges">
@@ -182,7 +197,14 @@
                               class="badge badge-neutral"
                               title="Summary Status">
                             <i class="fa-solid fa-brain"></i>
-                            AI Summary
+                            Summary
+                        </span>
+
+                        <span id="badge-email"
+                              class="badge badge-neutral"
+                              title="Email Status">
+                            <i class="fa-solid fa-envelope"></i>
+                            Email
                         </span>
 
                         <span id="badge-pdf"
@@ -198,11 +220,74 @@
 
             </header>
 
+            <!-- Global Multilingual Language Selector Bar -->
+            <div class="language-toolbar-bar">
+                <div class="lang-bar-group">
+                    <span class="lang-bar-label"><i class="fa-solid fa-microphone"></i> Spoken Language:</span>
+                    <select id="global-speech-lang" class="lang-select-sm">
+                        <option value="auto">🌐 Auto Detect Language</option>
+                        <option value="te">తెలుగు (Telugu)</option>
+                        <option value="hi">हिन्दी (Hindi)</option>
+                        <option value="ta">தமிழ் (Tamil)</option>
+                        <option value="kn">ಕನ್ನಡ (Kannada)</option>
+                        <option value="ml">മലയാളം (Malayalam)</option>
+                        <option value="bn">বাংলা (Bengali)</option>
+                        <option value="mr">मराठी (Marathi)</option>
+                        <option value="gu">ગુજરાતી (Gujarati)</option>
+                        <option value="pa">ਪੰਜਾਬੀ (Punjabi)</option>
+                        <option value="ur">اردو (Urdu)</option>
+                        <option value="en">English</option>
+                        <option value="es">Español (Spanish)</option>
+                        <option value="fr">Français (French)</option>
+                        <option value="de">Deutsch (German)</option>
+                        <option value="ar">العربية (Arabic)</option>
+                        <option value="zh">中文 (Chinese)</option>
+                        <option value="ja">日本語 (Japanese)</option>
+                        <option value="ko">한국어 (Korean)</option>
+                    </select>
+                </div>
+
+                <div class="lang-bar-group">
+                    <span class="lang-bar-label"><i class="fa-solid fa-language"></i> Translate To:</span>
+                    <select id="global-trans-lang" class="lang-select-sm">
+                        <option value="en" selected>English</option>
+                        <option value="te">తెలుగు (Telugu)</option>
+                        <option value="hi">हिन्दी (Hindi)</option>
+                        <option value="ta">தமிழ் (Tamil)</option>
+                        <option value="kn">ಕನ್ನಡ (Kannada)</option>
+                        <option value="ml">മലയാളം (Malayalam)</option>
+                        <option value="bn">বাংলা (Bengali)</option>
+                        <option value="mr">मराठी (Marathi)</option>
+                        <option value="gu">ગુજરાતી (Gujarati)</option>
+                        <option value="pa">ਪੰਜਾਬੀ (Punjabi)</option>
+                        <option value="ur">اردو (Urdu)</option>
+                        <option value="es">Español</option>
+                        <option value="fr">Français</option>
+                        <option value="de">Deutsch</option>
+                        <option value="ar">العربية</option>
+                    </select>
+                </div>
+
+                <div class="lang-bar-group">
+                    <span class="lang-bar-label"><i class="fa-solid fa-wand-magic-sparkles"></i> Summary & Report:</span>
+                    <select id="global-summary-lang" class="lang-select-sm">
+                        <option value="same" selected>Same as Meeting Language</option>
+                        <option value="en">English</option>
+                        <option value="te">తెలుగు (Telugu)</option>
+                        <option value="hi">हिन्दी (Hindi)</option>
+                        <option value="ta">தமிழ் (Tamil)</option>
+                        <option value="kn">ಕನ್ನಡ (Kannada)</option>
+                        <option value="ml">മലയാളം (Malayalam)</option>
+                        <option value="bn">বাংলা (Bengali)</option>
+                    </select>
+                </div>
+            </div>
+
 
             <!-- Dynamic Body Content -->
             <div class="content-container">
 
-                <!-- Notification Container for Toast Alerts -->
+                <!-- Toast Notifications Container -->
                 <div id="toast-container"
                      class="toast-container">
                 </div>
@@ -216,24 +301,114 @@
     </div>
 
 
-    <!-- Global Processing Overlay / Spinner -->
-    <div id="loading-spinner"
-         class="spinner-overlay hidden">
+    <!-- Global College Demo Mode Modal -->
+    <div id="demo-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div class="modal-title-group">
+                    <span class="modal-badge"><i class="fa-solid fa-graduation-cap"></i> College Presentation</span>
+                    <h3>Instant Multilingual Meeting Demonstrations</h3>
+                    <p>Load real-world multilingual meeting samples without needing a live microphone.</p>
+                </div>
+                <button id="btn-close-demo-modal" class="btn-close-modal" aria-label="Close Modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="demo-scenarios-grid">
+                    <!-- Scenario 1: Telugu -->
+                    <div class="demo-card" data-scenario="telugu_project">
+                        <div class="demo-card-flag">🇮🇳 Telugu</div>
+                        <h4>Software Sprint Review</h4>
+                        <p class="demo-script-sample">"ఈరోజు మన ప్రాజెక్ట్ స్ప్రింట్ సమీక్ష ప్రారంభమైంది. రవి ఫ్రంటెండ్ UI కాంపోనెంట్స్..."</p>
+                        <div class="demo-meta">
+                            <span><i class="fa-solid fa-clock"></i> 3m 45s</span>
+                            <span><i class="fa-solid fa-file-pdf"></i> NotoSansTelugu PDF</span>
+                        </div>
+                        <button class="btn btn-primary btn-sm btn-load-scenario" data-id="telugu_project">
+                            <i class="fa-solid fa-bolt"></i> Load Telugu Demo
+                        </button>
+                    </div>
 
-        <div class="spinner-card">
+                    <!-- Scenario 2: Hindi -->
+                    <div class="demo-card" data-scenario="hindi_product">
+                        <div class="demo-card-flag">🇮🇳 Hindi</div>
+                        <h4>Product Strategy & AI Launch</h4>
+                        <p class="demo-script-sample">"नमस्ते टीम, आज की बैठक में हम नए AI मीटिंग असिस्टेंट उत्पाद के लॉन्च पर चर्चा..."</p>
+                        <div class="demo-meta">
+                            <span><i class="fa-solid fa-clock"></i> 4m 40s</span>
+                            <span><i class="fa-solid fa-file-pdf"></i> NotoSansDevanagari PDF</span>
+                        </div>
+                        <button class="btn btn-primary btn-sm btn-load-scenario" data-id="hindi_product">
+                            <i class="fa-solid fa-bolt"></i> Load Hindi Demo
+                        </button>
+                    </div>
 
-            <div class="spinner-ring"></div>
+                    <!-- Scenario 3: Tamil -->
+                    <div class="demo-card" data-scenario="tamil_standup">
+                        <div class="demo-card-flag">🇮🇳 Tamil</div>
+                        <h4>Engineering Standup</h4>
+                        <p class="demo-script-sample">"அனைவருக்கும் வணக்கம். இன்றைய கூட்டத்தில் திட்டத்தின் முக்கிய மைல்கற்கள்..."</p>
+                        <div class="demo-meta">
+                            <span><i class="fa-solid fa-clock"></i> 3m 15s</span>
+                            <span><i class="fa-solid fa-file-pdf"></i> NotoSansTamil PDF</span>
+                        </div>
+                        <button class="btn btn-primary btn-sm btn-load-scenario" data-id="tamil_standup">
+                            <i class="fa-solid fa-bolt"></i> Load Tamil Demo
+                        </button>
+                    </div>
 
-            <h4 id="spinner-title">
-                Processing...
-            </h4>
+                    <!-- Scenario 4: Mixed -->
+                    <div class="demo-card" data-scenario="mixed_code_switch">
+                        <div class="demo-card-flag">🇮🇳 Mixed Code-Switching</div>
+                        <h4>Telugu + English Sync</h4>
+                        <p class="demo-script-sample">"Hi everyone, ippudu project progress gurinchi discuss cheddam. The frontend is almost completed..."</p>
+                        <div class="demo-meta">
+                            <span><i class="fa-solid fa-clock"></i> 3m 30s</span>
+                            <span><i class="fa-solid fa-shuffle"></i> Code-Switching AI</span>
+                        </div>
+                        <button class="btn btn-primary btn-sm btn-load-scenario" data-id="mixed_code_switch">
+                            <i class="fa-solid fa-bolt"></i> Load Mixed Demo
+                        </button>
+                    </div>
 
-            <p id="spinner-desc">
-                Connecting modules and analyzing meeting audio.
-            </p>
-
+                    <!-- Scenario 5: English -->
+                    <div class="demo-card" data-scenario="english_executive">
+                        <div class="demo-card-flag">🌐 English</div>
+                        <h4>Executive Board Review</h4>
+                        <p class="demo-script-sample">"Welcome everyone to our Q3 technology and platform review. Today our engineering team demonstrated..."</p>
+                        <div class="demo-meta">
+                            <span><i class="fa-solid fa-clock"></i> 5m 10s</span>
+                            <span><i class="fa-solid fa-shield"></i> Production Ready</span>
+                        </div>
+                        <button class="btn btn-primary btn-sm btn-load-scenario" data-id="english_executive">
+                            <i class="fa-solid fa-bolt"></i> Load English Demo
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
+    </div>
 
+
+    <!-- Global Processing Overlay / Spinner -->
+    <div id="loading-spinner" class="spinner-overlay hidden">
+        <div class="spinner-card">
+            <button type="button" class="spinner-close-btn" id="btn-close-spinner" title="Dismiss overlay">&times;</button>
+            <div class="spinner-ring"></div>
+            <h4 id="spinner-title">Processing...</h4>
+            <p id="spinner-desc">Connecting modules and analyzing meeting audio.</p>
+            <div class="spinner-pipeline-steps">
+                <span id="step-pipe-upload" class="pipe-step"><i class="fa-solid fa-upload"></i> Audio</span>
+                <span class="pipe-arrow">➔</span>
+                <span id="step-pipe-whisper" class="pipe-step"><i class="fa-solid fa-microphone-lines"></i> Whisper STT</span>
+                <span class="pipe-arrow">➔</span>
+                <span id="step-pipe-summary" class="pipe-step"><i class="fa-solid fa-brain"></i> AI Summary</span>
+                <span class="pipe-arrow">➔</span>
+                <span id="step-pipe-report" class="pipe-step"><i class="fa-solid fa-file-pdf"></i> Unicode PDF</span>
+            </div>
+            <button type="button" class="btn btn-outline btn-xs" id="btn-spinner-cancel" style="margin-top: 6px; font-size: 0.75rem; color: #64748b; border-color: #cbd5e1;">
+                <i class="fa-solid fa-xmark"></i> Dismiss Overlay
+            </button>
+        </div>
     </div>
 
 

@@ -1007,18 +1007,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 dlBtns.forEach(btn => {
                     btn.classList.remove('disabled');
                     btn.removeAttribute('disabled');
-                    btn.setAttribute('href', '/download/Meeting_Report.pdf');
+                    btn.setAttribute('href', `/download/Meeting_Report.pdf?lang=${encodeURIComponent(repLang)}`);
                     btn.setAttribute('download', 'Meeting_Report.pdf');
                 });
                 viewBtns.forEach(btn => {
                     btn.classList.remove('disabled');
                     btn.removeAttribute('disabled');
-                    btn.setAttribute('href', '/view/Meeting_Report.pdf');
+                    btn.setAttribute('href', `/view/Meeting_Report.pdf?lang=${encodeURIComponent(repLang)}`);
                 });
 
                 // Trigger automatic file download to the user's Downloads folder
                 const dlLink = document.createElement('a');
-                dlLink.href = '/download/Meeting_Report.pdf?t=' + Date.now();
+                dlLink.href = `/download/Meeting_Report.pdf?lang=${encodeURIComponent(repLang)}&t=${Date.now()}`;
                 dlLink.setAttribute('download', 'Meeting_Report.pdf');
                 document.body.appendChild(dlLink);
                 dlLink.click();
@@ -1026,7 +1026,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (dlLink.parentNode) dlLink.parentNode.removeChild(dlLink);
                 }, 500);
 
-                showToast('Unicode PDF Report Downloaded Successfully!', 'success');
+                showToast(`Unicode PDF Report (${repLang}) Downloaded Successfully!`, 'success');
                 fetchSystemStatus();
             } else {
                 if (reportErrorAlert && reportErrorText) {

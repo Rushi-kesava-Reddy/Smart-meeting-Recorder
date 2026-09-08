@@ -89,7 +89,7 @@ def transcribe_audio(audio_path, language="auto"):
     ------
     RuntimeError
         If configuration or the Groq request fails. Raising the exception is
-        intentional so Streamlit can display the real error instead of showing
+        intentional so the application can display the real error instead of showing
         a misleading empty-transcript message.
     """
 

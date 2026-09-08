@@ -224,14 +224,13 @@ def get_supported_languages():
 
 def get_groq_api_key():
     """
-    Retrieve Groq API key safely from Streamlit Secrets or Environment Variables.
-    Works seamlessly on both Streamlit Community Cloud and local environments.
+    Retrieve Groq API key safely from environment variables (including .env file).
     """
     try:
-        import streamlit as st
-        if hasattr(st, "secrets") and "GROQ_API_KEY" in st.secrets:
-            return st.secrets["GROQ_API_KEY"]
+        from dotenv import load_dotenv
+        load_dotenv()
     except Exception:
         pass
     return os.environ.get("GROQ_API_KEY")
+
 

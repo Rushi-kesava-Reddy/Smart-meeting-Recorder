@@ -162,6 +162,17 @@ def load_meeting_state():
     return {}
 
 
+def save_meeting_state(state_data):
+    current = load_meeting_state()
+    current.update(state_data)
+    try:
+        with open(STATE_PATH, "w", encoding="utf-8") as f:
+            json.dump(current, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"[WARN] Failed to write state file: {e}", file=sys.stderr)
+
+
+
 def clean_markdown_to_xml(text):
     """
     Clean markdown formatting and convert into ReportLab-compatible XML tags.
@@ -338,13 +349,14 @@ def generate_pdf_report(report_language="en"):
     is_bilingual = (target_mode == "bilingual")
     is_english = (target_mode in ("en", "english"))
 
-    primary_lang = "en" if is_bilingual or is_english else target_mode
+    primary_lang = "en" if is_bilingual else target_mode
+    target_lang_name = get_language_name(primary_lang)
     primary_font, _ = get_font_for_language(primary_lang)
     base_font = primary_font if primary_font in REGISTERED_FONTS else "NotoSans"
     if base_font not in REGISTERED_FONTS:
         base_font = "Helvetica"
 
-    print(f"[1] Generating PDF Report (Mode: {target_mode}, Base Font: {base_font})...")
+    print(f"[1] Generating PDF Report (Mode: {target_mode}, Primary: {target_lang_name}, Base Font: {base_font})...")
 
     # Load transcripts
     transcript = state.get("original_transcript", "")
@@ -357,19 +369,63 @@ def generate_pdf_report(report_language="en"):
         with open(TRANSLATED_PATH, "r", encoding="utf-8", errors="replace") as f:
             translated_transcript = f.read().strip()
 
-    # Load or generate summary in desired language
+    # ---------------------------------------------------------
+    # 1. RESOLVE TRANSCRIPT IN CHOSEN LANGUAGE
+    # ---------------------------------------------------------
+    # Ensure transcript is available in the user's chosen language for the PDF
+    target_transcript = ""
+    if primary_lang == detected_lang:
+        target_transcript = transcript
+    elif state.get("translation_language") == primary_lang and translated_transcript:
+        target_transcript = translated_transcript
+    elif transcript:
+        # Translate transcript to user's chosen language
+        try:
+            from translator import translate_text
+            print(f"[2] Translating meeting transcript to {target_lang_name} ({primary_lang}) for PDF report...")
+            translated_result = translate_text(transcript, target_language=primary_lang, source_language=detected_lang)
+            if translated_result:
+                target_transcript = translated_result
+                save_meeting_state({
+                    "translated_transcript": translated_result,
+                    "translation_language": primary_lang,
+                    "translation_language_name": target_lang_name
+                })
+        except Exception as e:
+            print(f"[WARN] Transcript translation to {primary_lang} failed: {e}", file=sys.stderr)
+
+    if not target_transcript:
+        target_transcript = translated_transcript if (primary_lang != detected_lang and translated_transcript) else transcript
+
+    # ---------------------------------------------------------
+    # 2. RESOLVE SUMMARY IN CHOSEN LANGUAGE
+    # ---------------------------------------------------------
+    # Ensure summary is available in the user's chosen language for the PDF
     summary = state.get("summary_text", "")
     current_summary_lang = state.get("summary_language", detected_lang)
 
-    # If user wants English report, but current summary is non-English, generate English summary
-    if is_english and current_summary_lang != "en" and transcript:
+    # If the user chose a language different from the current summary, generate or translate it
+    if primary_lang != current_summary_lang and transcript:
         try:
             from summarizer import generate_summary
-            print("[2] Regenerating English executive summary for clear viva report...")
-            res = generate_summary(summary_language="en")
-            summary = res.get("summary", summary)
+            print(f"[3] Generating executive summary in {target_lang_name} ({primary_lang}) for PDF report...")
+            res = generate_summary(summary_language=primary_lang)
+            if res and res.get("summary"):
+                summary = res.get("summary")
+                current_summary_lang = primary_lang
         except Exception as e:
-            print(f"[WARN] Could not regenerate English summary: {e}", file=sys.stderr)
+            print(f"[WARN] Direct summary generation in {primary_lang} failed: {e}", file=sys.stderr)
+            # Fallback: Translate existing summary using translator
+            if summary:
+                try:
+                    from translator import translate_text
+                    print(f"[3] Translating existing summary to {target_lang_name} ({primary_lang})...")
+                    translated_sum = translate_text(summary, target_language=primary_lang)
+                    if translated_sum:
+                        summary = translated_sum
+                        current_summary_lang = primary_lang
+                except Exception as trans_e:
+                    print(f"[WARN] Summary translation to {primary_lang} failed: {trans_e}", file=sys.stderr)
 
     if not summary and os.path.exists(SUMMARY_PATH):
         with open(SUMMARY_PATH, "r", encoding="utf-8", errors="replace") as f:
@@ -380,10 +436,9 @@ def generate_pdf_report(report_language="en"):
     decisions = state.get("decisions", [])
 
     if not action_items or len(action_items) == 0:
-        # Try extracting action items with updated prompt
         try:
             from action_items import extract_action_items
-            print("[3] Extracting action items and deliverables...")
+            print(f"[4] Extracting action items and deliverables in {target_lang_name}...")
             extracted = extract_action_items(transcript, output_language=primary_lang)
             action_items = extracted.get("action_items", [])
             decisions = extracted.get("decisions", decisions)
@@ -510,10 +565,10 @@ def generate_pdf_report(report_language="en"):
             Paragraph(clean_markdown_to_xml(f"{detected_name}"), body_style)
         ],
         [
-            Paragraph("<b>Report Format:</b>", body_style),
-            Paragraph(clean_markdown_to_xml(report_target_label), body_style),
-            Paragraph("<b>Target Scope:</b>", body_style),
-            Paragraph("Telugu, Kannada, Tamil, Hindi, English", body_style)
+            Paragraph("<b>Report Language:</b>", body_style),
+            Paragraph(clean_markdown_to_xml(target_lang_name), body_style),
+            Paragraph("<b>Document Scope:</b>", body_style),
+            Paragraph(clean_markdown_to_xml(f"Summary & Transcript in {target_lang_name}"), body_style)
         ]
     ]
 
@@ -655,22 +710,66 @@ def generate_pdf_report(report_language="en"):
 
     # 7. Full Meeting Transcript (Separate Page)
     story.append(PageBreak())
-    story.append(Paragraph("FULL MEETING TRANSCRIPT", title_style))
-    word_count = len(transcript.split())
-    story.append(Paragraph(f"Spoken Language: {detected_name} | Word Count: {word_count} | Status: Verified Audio", subtitle_style))
-    story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#2563eb"), spaceAfter=10))
 
-    if transcript:
-        t_font = get_best_font_for_text(transcript, default_lang=detected_lang)
-        t_style = ParagraphStyle("TranscriptBody", parent=body_style, fontName=t_font, leading=16, fontSize=9.5)
+    if primary_lang != detected_lang and target_transcript:
+        # Render transcript in the user's chosen report language
+        t_header_font = get_best_font_for_text(target_lang_name, default_lang=primary_lang)
+        t_title_style = ParagraphStyle("TransTitle", parent=title_style, fontName=t_header_font)
+        story.append(Paragraph(f"MEETING TRANSCRIPT ({target_lang_name.upper()})", t_title_style))
 
-        for para in transcript.split("\n"):
+        trans_word_count = len(target_transcript.split())
+        story.append(Paragraph(
+            f"Chosen Report Language: {target_lang_name} (Translated from Spoken {detected_name}) | Word Count: {trans_word_count} | Status: Verified",
+            subtitle_style
+        ))
+        story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#2563eb"), spaceAfter=10))
+
+        t_font = get_best_font_for_text(target_transcript, default_lang=primary_lang)
+        t_style = ParagraphStyle("TargetTranscriptBody", parent=body_style, fontName=t_font, leading=16, fontSize=9.5)
+
+        for para in target_transcript.split("\n"):
             clean_p = clean_markdown_to_xml(para)
             if clean_p:
                 story.append(Paragraph(clean_p, t_style))
                 story.append(Spacer(1, 4))
+
+        # Also provide original spoken audio transcript for complete reference
+        if transcript and transcript.strip() != target_transcript.strip():
+            story.append(Spacer(1, 10))
+            orig_h2_font = get_best_font_for_text(detected_name, default_lang=detected_lang)
+            orig_h2 = ParagraphStyle("OrigH2", parent=h2_style, fontName=orig_h2_font)
+            story.append(Paragraph(f"<b>Original Spoken Transcript ({detected_name})</b>", orig_h2))
+            story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#cbd5e1"), spaceAfter=6))
+
+            orig_font = get_best_font_for_text(transcript, default_lang=detected_lang)
+            orig_style = ParagraphStyle("OrigTranscriptBody", parent=body_style, fontName=orig_font, leading=15, fontSize=9)
+
+            for para in transcript.split("\n"):
+                clean_p = clean_markdown_to_xml(para)
+                if clean_p:
+                    story.append(Paragraph(clean_p, orig_style))
+                    story.append(Spacer(1, 3))
     else:
-        story.append(Paragraph("Transcript is empty or not yet generated.", body_style))
+        # Target language matches the spoken meeting language
+        spoken_title_font = get_best_font_for_text(detected_name, default_lang=detected_lang)
+        t_title_style = ParagraphStyle("SpokenTitle", parent=title_style, fontName=spoken_title_font)
+        story.append(Paragraph(f"FULL MEETING TRANSCRIPT ({detected_name.upper()})", t_title_style))
+
+        word_count = len(transcript.split()) if transcript else 0
+        story.append(Paragraph(f"Spoken Language: {detected_name} | Word Count: {word_count} | Status: Verified Audio", subtitle_style))
+        story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#2563eb"), spaceAfter=10))
+
+        if transcript:
+            t_font = get_best_font_for_text(transcript, default_lang=detected_lang)
+            t_style = ParagraphStyle("TranscriptBody", parent=body_style, fontName=t_font, leading=16, fontSize=9.5)
+
+            for para in transcript.split("\n"):
+                clean_p = clean_markdown_to_xml(para)
+                if clean_p:
+                    story.append(Paragraph(clean_p, t_style))
+                    story.append(Spacer(1, 4))
+        else:
+            story.append(Paragraph("Transcript is empty or not yet generated.", body_style))
 
     # Build PDF with dynamic NumberedCanvas
     doc.build(story, canvasmaker=NumberedCanvas)
@@ -680,7 +779,7 @@ def generate_pdf_report(report_language="en"):
 
 
 def generate_pdf_report_bytes(report_language="same"):
-    """Generate the PDF report and return the raw bytes for Streamlit download."""
+    """Generate the PDF report and return the raw bytes for web download."""
     path = generate_pdf_report(report_language=report_language)
     if path and os.path.exists(path):
         with open(path, "rb") as f:

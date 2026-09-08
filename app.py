@@ -1,905 +1,839 @@
 """
-Multilingual AI Smart Meeting Recorder & Executive Assistant
-Render / Streamlit & Local Deployment Application.
-
-Supports end-to-end meeting workflow:
-🎙️ Audio Capture & Upload
-🌐 Automatic Language Detection (Telugu, Hindi, Tamil, Kannada, Malayalam, Bengali, Marathi, Gujarati, Punjabi, Urdu, English, etc.)
-📝 Original Script Transcript Preservation
-🔄 Context-Aware AI Translation
-🤖 7-Section Executive Multilingual Summarization
-📌 Action Items & Decisions Matrix
-✉️ Prioritized Follow-Up Email Drafting
-📄 Unicode PDF Report Generation with Bundled Google Noto TrueType Fonts
-⚡ One-Click College Viva Demonstration Scenarios
+Multilingual AI Smart Meeting Recorder & Intelligent Meeting Assistant
+Main Flask Web Application & REST API Gateway.
 """
 
 import os
 import sys
 import json
-import streamlit as st
+import threading
+from datetime import datetime
 
-# Configure page settings first
-st.set_page_config(
-    page_title="Smart Meeting Recorder & Multilingual Assistant",
-    page_icon="🎙️",
-    layout="wide",
-    initial_sidebar_state="expanded"
+from flask import (
+    Flask,
+    render_template,
+    request,
+    send_file,
+    jsonify,
+    redirect,
+    url_for
 )
+from dotenv import load_dotenv
 
-# Render / local API key configuration
-# IMPORTANT: Render uses Environment Variables, not Streamlit secrets.toml.
-# Never access st.secrets here because it raises StreamlitSecretNotFoundError
-# when no secrets.toml file exists.
-def get_groq_api_key():
-    return os.getenv("GROQ_API_KEY", "").strip()
+# Load environment variables
+load_dotenv()
 
-# Import backend modules
-from languages import get_supported_languages, get_language_name, get_language_info
-from speech_to_text import transcribe_audio, save_meeting_state, load_meeting_state
+# Import Modular Engine Components
+import languages
+from speech_to_text import transcribe_audio
 from translator import translate_text
 from summarizer import generate_summary
 from action_items import extract_action_items
 from email_drafter import draft_followup_email
-from report_generator import generate_pdf_report, generate_pdf_report_bytes, PDF_PATH
-from demo_data import DEMO_SCENARIOS, get_demo_scenario
+from report_generator import generate_pdf_report
+from demo_data import get_demo_scenario, get_all_demo_scenarios
 
+# ============================================================
+# FLASK CONFIGURATION
+# ============================================================
+
+app = Flask(__name__)
+app.secret_key = os.environ.get(
+    "SECRET_KEY",
+    "smart_meeting_recorder_secure_production_secret_key_v2"
+)
+
+# Project paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MEETINGS_DIR = os.path.join(BASE_DIR, "meetings")
+os.makedirs(MEETINGS_DIR, exist_ok=True)
+
 WAV_PATH = os.path.join(MEETINGS_DIR, "meeting.wav")
 TRANSCRIPT_PATH = os.path.join(MEETINGS_DIR, "transcript.txt")
 TRANSLATED_PATH = os.path.join(MEETINGS_DIR, "translated_transcript.txt")
 SUMMARY_PATH = os.path.join(MEETINGS_DIR, "summary.txt")
+PDF_PATH = os.path.join(MEETINGS_DIR, "Meeting_Report.pdf")
 EMAIL_PATH = os.path.join(MEETINGS_DIR, "email_draft.txt")
 STATE_PATH = os.path.join(MEETINGS_DIR, "meeting_state.json")
 
-os.makedirs(MEETINGS_DIR, exist_ok=True)
+# ============================================================
+# THREAD-SAFE STATE MANAGEMENT
+# ============================================================
+
+state_lock = threading.Lock()
+
+def get_persisted_state():
+    """Read state from JSON file or return clean defaults."""
+    if os.path.exists(STATE_PATH):
+        try:
+            with open(STATE_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {
+        "detected_language": "en",
+        "detected_language_name": "English",
+        "transcription_confidence": 0.95,
+        "duration": 0,
+        "word_count": 0,
+        "original_transcript": "",
+        "translated_transcript": "",
+        "translation_language": "en",
+        "summary_text": "",
+        "summary_language": "same",
+        "action_items": [],
+        "decisions": [],
+        "email_draft": {},
+        "report_language": "same"
+    }
+
+def update_persisted_state(updates):
+    """Update state on disk thread-safely."""
+    current = get_persisted_state()
+    current.update(updates)
+    try:
+        with open(STATE_PATH, "w", encoding="utf-8") as f:
+            json.dump(current, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"[WARN] Failed to write meeting_state.json: {e}", file=sys.stderr)
+    return current
+
+# In-memory transient background task tracker
+async_task_state = {
+    "status": "idle",
+    "stage": "",
+    "progress": "",
+    "error": None
+}
+
+# ============================================================
+# HEALTH & ERROR HANDLERS
+# ============================================================
+
+@app.route("/health", methods=["GET"])
+def health_check():
+    return jsonify({
+        "status": "ok",
+        "service": "Multilingual Smart Meeting Recorder",
+        "timestamp": datetime.now().isoformat()
+    }), 200
 
 
-# ==============================================================================
-# CUSTOM STYLING (MODERN CORPORATE & COLLEGE DEMO THEME)
-# ==============================================================================
-st.markdown("""
-<style>
-    /* Global Typography & Palette */
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
-    
-    html, body, [class*="css"] {
-        font-family: 'Plus Jakarta Sans', sans-serif;
-    }
-    
-    /* Modern Header Card */
-    .app-header-card {
-        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-        border-radius: 14px;
-        padding: 24px 32px;
-        margin-bottom: 24px;
-        color: #ffffff;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.2);
-    }
-    .app-header-title {
-        font-size: 1.85rem;
-        font-weight: 800;
-        letter-spacing: -0.02em;
-        margin-bottom: 6px;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-    }
-    .app-header-subtitle {
-        color: #94a3b8;
-        font-size: 0.95rem;
-        margin: 0;
-    }
-    .badge-pill-header {
-        background: #2563eb;
-        color: #ffffff;
-        font-size: 0.72rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        padding: 4px 10px;
-        border-radius: 999px;
-        letter-spacing: 0.05em;
-    }
-    
-    /* KPI Metric Cards */
-    .kpi-container {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 14px;
-        margin-bottom: 24px;
-    }
-    .kpi-card {
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 16px 20px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
-        transition: transform 0.15s ease, box-shadow 0.15s ease;
-    }
-    .kpi-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.04);
-    }
-    .kpi-label {
-        font-size: 0.75rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: #64748b;
-        margin-bottom: 4px;
-    }
-    .kpi-val {
-        font-size: 1.35rem;
-        font-weight: 700;
-        color: #0f172a;
-    }
-    .kpi-tag-blue { color: #2563eb; }
-    .kpi-tag-green { color: #16a34a; }
-    .kpi-tag-purple { color: #7c3aed; }
-    .kpi-tag-amber { color: #d97706; }
-
-    /* Module Section Banners */
-    .module-banner {
-        background: #f1f5f9;
-        border-left: 4px solid #2563eb;
-        border-radius: 6px;
-        padding: 10px 16px;
-        margin-bottom: 16px;
-        font-size: 0.9rem;
-        color: #334155;
-    }
-    
-    /* Priority Pills */
-    .priority-pill {
-        display: inline-block;
-        padding: 4px 12px;
-        border-radius: 999px;
-        font-size: 0.8rem;
-        font-weight: 700;
-        letter-spacing: 0.03em;
-    }
-    .priority-urgent { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
-    .priority-high { background: #ffedd5; color: #c2410c; border: 1px solid #fdba74; }
-    .priority-medium { background: #fef9c3; color: #854d0e; border: 1px solid #fde047; }
-    .priority-low { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
-    
-    /* Native Script Output Highlight */
-    .native-script-box {
-        font-size: 1.05rem;
-        line-height: 1.65;
-        background: #fafafa;
-        border: 1px solid #e5e7eb;
-        border-radius: 8px;
-        padding: 16px;
-    }
-</style>
-""", unsafe_allow_html=True)
+@app.errorhandler(404)
+def page_not_found(error):
+    if request.path.startswith("/api/"):
+        return jsonify({"status": "error", "message": "API endpoint not found"}), 404
+    return render_template("index.html"), 404
 
 
-# ==============================================================================
-# SESSION STATE INITIALIZATION
-# ==============================================================================
-def init_session():
-    persisted = load_meeting_state()
-    defaults = {
-        "original_transcript": persisted.get("original_transcript", ""),
-        "detected_language": persisted.get("detected_language", "en"),
-        "detected_language_name": persisted.get("detected_language_name", "English"),
-        "transcription_confidence": persisted.get("transcription_confidence", 0.95),
-        "duration": persisted.get("duration", 0),
-        "word_count": persisted.get("word_count", 0),
-        "translated_transcript": persisted.get("translated_transcript", ""),
-        "translation_language": persisted.get("translation_language", "en"),
-        "summary": persisted.get("summary_text", ""),
-        "summary_language": persisted.get("summary_language", "same"),
-        "action_items": persisted.get("action_items", []),
-        "decisions": persisted.get("decisions", []),
-        "email_draft": persisted.get("email_draft", {}),
-        "pdf_bytes": None,
-        "selected_scenario": None
-    }
-    for k, v in defaults.items():
-        if k not in st.session_state:
-            st.session_state[k] = v
+@app.errorhandler(500)
+def internal_server_error(error):
+    if request.path.startswith("/api/"):
+        return jsonify({"status": "error", "message": "Internal server error"}), 500
+    return jsonify({"status": "error", "message": "An internal server error occurred"}), 500
 
-    # Read files if state is missing them
-    if not st.session_state["original_transcript"] and os.path.exists(TRANSCRIPT_PATH):
+
+# ============================================================
+# PAGE ROUTES
+# ============================================================
+
+@app.route("/")
+@app.route("/record")
+def index():
+    return render_template("index.html")
+
+
+@app.route("/transcript")
+def transcript_page():
+    return render_template("transcript.html")
+
+
+@app.route("/summary")
+def summary_page():
+    return render_template("summary.html")
+
+
+@app.route("/email")
+def email_page():
+    return render_template("email.html")
+
+
+@app.route("/report")
+def report_page():
+    return render_template("report.html")
+
+
+@app.route("/modules")
+def modules_page():
+    return render_template("modules.html")
+
+
+@app.route("/about")
+def about_page():
+    return render_template("about.html")
+
+
+# ============================================================
+# API - SYSTEM STATUS & METADATA
+# ============================================================
+
+@app.route("/api/status", methods=["GET"])
+def get_status():
+    """
+    Consolidated system state endpoint returning file availability,
+    transcription progress, and language intelligence metadata.
+    """
+    state = get_persisted_state()
+
+    # Read transcript from file if not in state
+    transcript_text = state.get("original_transcript", "")
+    if not transcript_text and os.path.exists(TRANSCRIPT_PATH):
         try:
             with open(TRANSCRIPT_PATH, "r", encoding="utf-8") as f:
-                st.session_state["original_transcript"] = f.read().strip()
+                transcript_text = f.read()
         except Exception:
             pass
 
-    if not st.session_state["translated_transcript"] and os.path.exists(TRANSLATED_PATH):
+    # Read translated transcript
+    translated_text = state.get("translated_transcript", "")
+    if not translated_text and os.path.exists(TRANSLATED_PATH):
         try:
             with open(TRANSLATED_PATH, "r", encoding="utf-8") as f:
-                st.session_state["translated_transcript"] = f.read().strip()
+                translated_text = f.read()
         except Exception:
             pass
 
-    if not st.session_state["summary"] and os.path.exists(SUMMARY_PATH):
+    # Read summary
+    summary_text = state.get("summary_text", "")
+    if not summary_text and os.path.exists(SUMMARY_PATH):
         try:
             with open(SUMMARY_PATH, "r", encoding="utf-8") as f:
-                st.session_state["summary"] = f.read().strip()
+                summary_text = f.read()
         except Exception:
             pass
 
-init_session()
+    with state_lock:
+        task_status = async_task_state["status"]
+        task_stage = async_task_state["stage"]
+        task_progress = async_task_state["progress"]
+        task_error = async_task_state["error"]
+
+    return jsonify({
+        "has_audio": os.path.exists(WAV_PATH),
+        "has_transcript": bool(transcript_text),
+        "has_translation": bool(translated_text),
+        "has_summary": bool(summary_text),
+        "has_email": bool(state.get("email_draft", {}).get("body")),
+        "has_pdf": os.path.exists(PDF_PATH),
+
+        "transcript": transcript_text,
+        "translated_transcript": translated_text,
+        "summary": summary_text,
+        "action_items": state.get("action_items", []),
+        "decisions": state.get("decisions", []),
+        "email_draft": state.get("email_draft", {}),
+
+        "detected_language": state.get("detected_language", "en"),
+        "detected_language_name": state.get("detected_language_name", "English"),
+        "transcription_confidence": state.get("transcription_confidence", 0.95),
+        "duration": state.get("duration", 0),
+        "word_count": state.get("word_count", len(transcript_text.split()) if transcript_text else 0),
+        "summary_language": state.get("summary_language", "same"),
+        "translation_language": state.get("translation_language", "en"),
+        "report_language": state.get("report_language", "same"),
+
+        "transcription_status": task_status,
+        "task_stage": task_stage,
+        "transcription_progress": task_progress,
+        "transcription_error": task_error
+    })
 
 
-# ==============================================================================
-# SIDEBAR: BRANDING, CLOUD STATUS & VIVA DEMO PRESETS
-# ==============================================================================
-with st.sidebar:
-    st.markdown("### 🎙️ SmartRecorder")
-    st.markdown("<span class='badge-pill-header'>v3.0 Multilingual AI</span>", unsafe_allow_html=True)
-    st.caption("Multilingual Meeting Intelligence for Render / Streamlit")
-    
-    st.divider()
-
-    # Cloud Readiness Status Indicator
-    api_key_set = bool(get_groq_api_key())
-    if api_key_set:
-        st.success("🟢 Groq Whisper API Connected")
-    else:
-        st.error("🔴 GROQ_API_KEY Not Configured")
-        st.info("Add `GROQ_API_KEY` in Render → Environment Variables.")
-
-    st.divider()
-
-    # College Viva Demonstration Scenarios
-    st.markdown("#### ⚡ Viva Demo Scenarios")
-    st.caption("Pre-configured multilingual meeting intelligence datasets:")
-
-    col_s1, col_s2 = st.columns(2)
-    with col_s1:
-        if st.button("🇮🇳 Telugu Sprint", use_container_width=True):
-            sc = get_demo_scenario("telugu_project")
-            if sc:
-                st.session_state["original_transcript"] = sc["transcript"]
-                st.session_state["detected_language"] = sc["language_code"]
-                st.session_state["detected_language_name"] = sc["language_name"]
-                st.session_state["translated_transcript"] = sc.get("translation_en", "")
-                st.session_state["summary"] = sc.get("summary", "")
-                st.session_state["action_items"] = sc.get("action_items", [])
-                st.session_state["decisions"] = sc.get("decisions", [])
-                st.session_state["email_draft"] = sc.get("email_draft", {})
-                st.session_state["word_count"] = len(sc["transcript"].split())
-                st.session_state["duration"] = sc.get("duration", 225)
-                st.session_state["transcription_confidence"] = 0.98
-                st.toast("Loaded Telugu Sprint Review scenario!", icon="🚀")
-                st.rerun()
-
-    with col_s2:
-        if st.button("🇮🇳 Tamil Standup", use_container_width=True):
-            sc = get_demo_scenario("tamil_standup")
-            if sc:
-                st.session_state["original_transcript"] = sc["transcript"]
-                st.session_state["detected_language"] = sc["language_code"]
-                st.session_state["detected_language_name"] = sc["language_name"]
-                st.session_state["translated_transcript"] = sc.get("translation_en", "")
-                st.session_state["summary"] = sc.get("summary", "")
-                st.session_state["action_items"] = sc.get("action_items", [])
-                st.session_state["decisions"] = sc.get("decisions", [])
-                st.session_state["email_draft"] = sc.get("email_draft", {})
-                st.session_state["word_count"] = len(sc["transcript"].split())
-                st.session_state["duration"] = sc.get("duration", 195)
-                st.session_state["transcription_confidence"] = 0.96
-                st.toast("Loaded Tamil Standup Sync scenario!", icon="🚀")
-                st.rerun()
-
-    col_s3, col_s4 = st.columns(2)
-    with col_s3:
-        if st.button("🇮🇳 Hindi Review", use_container_width=True):
-            sc = get_demo_scenario("hindi_sync")
-            if sc:
-                st.session_state["original_transcript"] = sc["transcript"]
-                st.session_state["detected_language"] = sc["language_code"]
-                st.session_state["detected_language_name"] = sc["language_name"]
-                st.session_state["translated_transcript"] = sc.get("translation_en", "")
-                st.session_state["summary"] = sc.get("summary", "")
-                st.session_state["action_items"] = sc.get("action_items", [])
-                st.session_state["decisions"] = sc.get("decisions", [])
-                st.session_state["email_draft"] = sc.get("email_draft", {})
-                st.session_state["word_count"] = len(sc["transcript"].split())
-                st.session_state["duration"] = sc.get("duration", 260)
-                st.session_state["transcription_confidence"] = 0.97
-                st.toast("Loaded Hindi Sync scenario!", icon="🚀")
-                st.rerun()
-
-    with col_s4:
-        if st.button("🇮🇳 Mixed Code-Switch", use_container_width=True):
-            sc = get_demo_scenario("mixed_code_switch")
-            if sc:
-                st.session_state["original_transcript"] = sc["transcript"]
-                st.session_state["detected_language"] = sc["language_code"]
-                st.session_state["detected_language_name"] = sc["language_name"]
-                st.session_state["translated_transcript"] = sc.get("translation_en", "")
-                st.session_state["summary"] = sc.get("summary", "")
-                st.session_state["action_items"] = sc.get("action_items", [])
-                st.session_state["decisions"] = sc.get("decisions", [])
-                st.session_state["email_draft"] = sc.get("email_draft", {})
-                st.session_state["word_count"] = len(sc["transcript"].split())
-                st.session_state["duration"] = sc.get("duration", 210)
-                st.session_state["transcription_confidence"] = 0.94
-                st.toast("Loaded Telugu + English Mixed scenario!", icon="🚀")
-                st.rerun()
-
-    if st.button("🌐 English Executive Review", use_container_width=True):
-        sc = get_demo_scenario("english_executive")
-        if sc:
-            st.session_state["original_transcript"] = sc["transcript"]
-            st.session_state["detected_language"] = sc["language_code"]
-            st.session_state["detected_language_name"] = sc["language_name"]
-            st.session_state["translated_transcript"] = sc.get("translation_en", "")
-            st.session_state["summary"] = sc.get("summary", "")
-            st.session_state["action_items"] = sc.get("action_items", [])
-            st.session_state["decisions"] = sc.get("decisions", [])
-            st.session_state["email_draft"] = sc.get("email_draft", {})
-            st.session_state["word_count"] = len(sc["transcript"].split())
-            st.session_state["duration"] = sc.get("duration", 310)
-            st.session_state["transcription_confidence"] = 0.99
-            st.toast("Loaded English Executive Board Review!", icon="🚀")
-            st.rerun()
-
-    st.divider()
-
-    # Session Reset
-    if st.button("🗑️ Reset Meeting Session", use_container_width=True):
-        for k in list(st.session_state.keys()):
-            del st.session_state[k]
-        # Clean disk artifacts
-        for p in [WAV_PATH, TRANSCRIPT_PATH, TRANSLATED_PATH, SUMMARY_PATH, EMAIL_PATH, STATE_PATH, PDF_PATH]:
-            if os.path.exists(p):
-                try:
-                    os.remove(p)
-                except Exception:
-                    pass
-        init_session()
-        st.toast("Session reset successfully.", icon="🧹")
-        st.rerun()
+@app.route("/api/languages", methods=["GET"])
+def get_languages():
+    """Return all supported languages with native names."""
+    return jsonify({
+        "status": "success",
+        "languages": languages.get_supported_languages()
+    })
 
 
-# ==============================================================================
-# MAIN PAGE HEADER & KPI METRICS
-# ==============================================================================
-st.markdown("""
-<div class='app-header-card'>
-    <div class='app-header-title'>
-        🎙️ Smart Meeting Recorder & Multilingual Assistant
-        <span class='badge-pill-header'>Render & Streamlit Ready</span>
-    </div>
-    <p class='app-header-subtitle'>
-        Multilingual Speech-to-Text, Contextual Translation, Structured Executive Summarization, Action Extraction & Unicode PDF Engine.
-    </p>
-</div>
-""", unsafe_allow_html=True)
-
-# Metrics Grid
-dur_secs = int(st.session_state["duration"] or 0)
-m, s = divmod(dur_secs, 60)
-dur_str = f"{m:02d}:{s:02d}"
-conf_pct = int((st.session_state["transcription_confidence"] or 0.95) * 100)
-actions_count = len(st.session_state["action_items"])
-prio_val = st.session_state["email_draft"].get("priority", "Normal") if isinstance(st.session_state["email_draft"], dict) else "Normal"
-
-st.markdown(f"""
-<div class='kpi-container'>
-    <div class='kpi-card'>
-        <div class='kpi-label'>Meeting Language</div>
-        <div class='kpi-val kpi-tag-blue'>{st.session_state["detected_language_name"]}</div>
-    </div>
-    <div class='kpi-card'>
-        <div class='kpi-label'>Whisper Accuracy</div>
-        <div class='kpi-val kpi-tag-green'>{conf_pct}% Fidelity</div>
-    </div>
-    <div class='kpi-card'>
-        <div class='kpi-label'>Audio Duration</div>
-        <div class='kpi-val kpi-tag-purple'>{dur_str}</div>
-    </div>
-    <div class='kpi-card'>
-        <div class='kpi-label'>Total Words</div>
-        <div class='kpi-val'>{st.session_state["word_count"]} words</div>
-    </div>
-    <div class='kpi-card'>
-        <div class='kpi-label'>Action Items</div>
-        <div class='kpi-val kpi-tag-amber'>{actions_count} items</div>
-    </div>
-    <div class='kpi-card'>
-        <div class='kpi-label'>Email Priority</div>
-        <div class='kpi-val'>{prio_val}</div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+@app.route("/api/demo_scenarios", methods=["GET"])
+def get_demo_scenarios():
+    """Return list of pre-configured college demo scenarios."""
+    return jsonify({
+        "status": "success",
+        "scenarios": get_all_demo_scenarios()
+    })
 
 
-# Supported languages map for dropdowns
-LANG_OPTIONS = {lang["code"]: f"{lang['name']} ({lang['native']})" if lang["name"] != lang["native"] else lang["name"] for lang in get_supported_languages()}
-LANG_CODES = list(LANG_OPTIONS.keys())
+# ============================================================
+# API - AUDIO CAPTURE & UPLOAD
+# ============================================================
+
+@app.route("/api/save_audio", methods=["POST"])
+def save_audio():
+    """Save audio recording from browser microphone or upload form."""
+    if "audio_file" not in request.files:
+        return jsonify({"status": "error", "message": "No audio file provided in request."}), 400
+
+    file = request.files["audio_file"]
+    if file.filename == "":
+        return jsonify({"status": "error", "message": "Empty file uploaded."}), 400
+
+    try:
+        file.save(WAV_PATH)
+
+        # Reset async state
+        with state_lock:
+            async_task_state["status"] = "idle"
+            async_task_state["stage"] = ""
+            async_task_state["progress"] = ""
+            async_task_state["error"] = None
+
+        return jsonify({
+            "status": "success",
+            "message": "Audio recording saved successfully",
+            "filename": "meeting.wav"
+        })
+
+    except Exception as error:
+        return jsonify({"status": "error", "message": f"Failed to save audio: {str(error)}"}), 500
 
 
-# ==============================================================================
-# WORKFLOW TABS
-# ==============================================================================
-tab_audio, tab_transcript, tab_summary, tab_email, tab_pdf, tab_arch = st.tabs([
-    "🎙️ 1. Audio Capture",
-    "📝 2. Transcript & Translation",
-    "🤖 3. Summary & Action Items",
-    "✉️ 4. Email Assistant",
-    "📄 5. Unicode PDF Report",
-    "🏛️ 6. Architecture & Viva Guide"
-])
+@app.route("/api/record_server", methods=["POST"])
+def record_server():
+    """Alternative hardware recorder fallback for local testing."""
+    recorder_script = os.path.join(BASE_DIR, "recorder.py")
+    if not os.path.exists(recorder_script):
+        return jsonify({"status": "error", "message": "recorder.py not found."}), 404
+
+    import subprocess
+    try:
+        result = subprocess.run([sys.executable, recorder_script], cwd=BASE_DIR, capture_output=True, text=True, check=True)
+        return jsonify({"status": "success", "message": "Hardware recording finished", "stdout": result.stdout})
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Hardware recording failed: {str(e)}"}), 500
 
 
-# ------------------------------------------------------------------------------
-# TAB 1: AUDIO CAPTURE & RECORDING
-# ------------------------------------------------------------------------------
-with tab_audio:
-    st.markdown("<div class='module-banner'><b>Module 1: Audio Capture</b> — Record live speech directly from your microphone or upload any meeting recording. Supports Telugu, Hindi, Tamil, Kannada, Malayalam, Bengali, English, and more.</div>", unsafe_allow_html=True)
+# ============================================================
+# API - MULTILINGUAL SPEECH TO TEXT
+# ============================================================
 
-    col_rec1, col_rec2 = st.columns([1, 1])
+def run_transcription_background(language="auto"):
+    """Background worker executing Groq Whisper speech recognition."""
+    with state_lock:
+        async_task_state["status"] = "processing"
+        async_task_state["stage"] = "transcribing"
+        async_task_state["progress"] = "Connecting to Groq Whisper and analyzing audio..."
+        async_task_state["error"] = None
 
-    with col_rec1:
-        st.markdown("##### 🎙️ Record from Microphone")
-        audio_prompt = st.audio_input("Click the microphone to start recording your meeting speech")
-        if audio_prompt is not None:
-            audio_bytes = audio_prompt.read()
-            with open(WAV_PATH, "wb") as f:
-                f.write(audio_bytes)
-            st.success("✅ Microphone audio recorded and saved to meetings/meeting.wav")
-            st.audio(audio_bytes)
+    try:
+        result = transcribe_audio(WAV_PATH, language=language)
 
-    with col_rec2:
-        st.markdown("##### 📁 Or Upload Audio File")
-        uploaded_file = st.file_uploader(
-            "Upload meeting recording",
-            type=["wav", "mp3", "m4a", "webm", "ogg"],
-            help="Supports audio files up to 25MB in all standard speech formats."
+        if not result or not result.get("text"):
+            with state_lock:
+                async_task_state["status"] = "error"
+                async_task_state["error"] = "Speech recognition produced an empty transcript. Please check audio clarity."
+                async_task_state["progress"] = "Transcription failed"
+            return
+
+        transcript_text = result["text"]
+
+        # Write transcript.txt
+        with open(TRANSCRIPT_PATH, "w", encoding="utf-8") as f:
+            f.write(transcript_text)
+
+        # Update persisted state
+        update_persisted_state({
+            "original_transcript": transcript_text,
+            "detected_language": result["language_code"],
+            "detected_language_name": result["language_name"],
+            "transcription_confidence": result["confidence"],
+            "duration": result["duration"],
+            "word_count": result["word_count"]
+        })
+
+        with state_lock:
+            async_task_state["status"] = "completed"
+            async_task_state["stage"] = "done"
+            async_task_state["progress"] = f"Transcribed successfully in {result['language_name']} ({int(result['confidence']*100)}% confidence)."
+            async_task_state["error"] = None
+
+    except Exception as e:
+        with state_lock:
+            async_task_state["status"] = "error"
+            async_task_state["error"] = f"Speech recognition failed: {str(e)}"
+            async_task_state["progress"] = "Error during transcription"
+
+
+@app.route("/api/transcribe", methods=["POST"])
+def run_transcribe():
+    """Trigger fast speech-to-text with optional language parameter."""
+    if not os.path.exists(WAV_PATH):
+        return jsonify({"status": "error", "message": "No audio found at meetings/meeting.wav. Please record or upload audio first."}), 400
+
+    data = request.get_json(silent=True) or {}
+    req_lang = data.get("language", "auto")
+
+    with state_lock:
+        async_task_state["status"] = "processing"
+        async_task_state["stage"] = "transcribing"
+        async_task_state["progress"] = f"Connecting to Groq Whisper (Language: {req_lang})..."
+        async_task_state["error"] = None
+
+    try:
+        result = transcribe_audio(WAV_PATH, language=req_lang)
+
+        if not result or not result.get("text"):
+            with state_lock:
+                async_task_state["status"] = "error"
+                async_task_state["error"] = "Speech recognition produced an empty transcript. Please check audio clarity."
+                async_task_state["progress"] = "Transcription failed"
+            return jsonify({
+                "status": "error",
+                "message": "Speech recognition produced an empty transcript. Please check audio clarity."
+            }), 400
+
+        transcript_text = result["text"]
+
+        # Write transcript.txt
+        with open(TRANSCRIPT_PATH, "w", encoding="utf-8") as f:
+            f.write(transcript_text)
+
+        # Update persisted state
+        update_persisted_state({
+            "original_transcript": transcript_text,
+            "detected_language": result["language_code"],
+            "detected_language_name": result["language_name"],
+            "transcription_confidence": result["confidence"],
+            "duration": result["duration"],
+            "word_count": result["word_count"]
+        })
+
+        with state_lock:
+            async_task_state["status"] = "completed"
+            async_task_state["stage"] = "done"
+            async_task_state["progress"] = f"Transcribed successfully in {result['language_name']} ({int(result['confidence']*100)}% confidence)."
+            async_task_state["error"] = None
+
+        return jsonify({
+            "status": "success",
+            "message": f"Speech recognized successfully as {result['language_name']}!",
+            "transcript": transcript_text,
+            "detected_language": result["language_code"],
+            "detected_language_name": result["language_name"],
+            "transcription_confidence": result["confidence"],
+            "duration": result["duration"],
+            "word_count": result["word_count"],
+            "transcription_status": "completed"
+        })
+
+    except Exception as e:
+        with state_lock:
+            async_task_state["status"] = "error"
+            async_task_state["error"] = f"Speech recognition failed: {str(e)}"
+            async_task_state["progress"] = "Error during transcription"
+        return jsonify({
+            "status": "error",
+            "message": f"Speech recognition failed: {str(e)}"
+        }), 500
+
+
+@app.route("/hybridaction/<path:subpath>", methods=["GET", "POST"])
+def swallow_tracker(subpath):
+    """Handle client tracker requests quietly without 404 logs."""
+    return ("", 204)
+
+
+# ============================================================
+# API - TRANSLATION
+# ============================================================
+
+@app.route("/api/translate", methods=["POST"])
+def run_translate():
+    """Translate meeting transcript into target language."""
+    data = request.get_json(silent=True) or {}
+    target_lang = data.get("target_language", "en")
+
+    state = get_persisted_state()
+    transcript = state.get("original_transcript", "")
+
+    if not transcript and os.path.exists(TRANSCRIPT_PATH):
+        with open(TRANSCRIPT_PATH, "r", encoding="utf-8") as f:
+            transcript = f.read()
+
+    if not transcript:
+        return jsonify({"status": "error", "message": "No transcript available to translate. Run Speech-to-Text first."}), 400
+
+    source_lang = state.get("detected_language", None)
+
+    try:
+        translated = translate_text(transcript, target_language=target_lang, source_language=source_lang)
+
+        with open(TRANSLATED_PATH, "w", encoding="utf-8") as f:
+            f.write(translated)
+
+        target_name = languages.get_language_name(target_lang)
+        update_persisted_state({
+            "translated_transcript": translated,
+            "translation_language": target_lang,
+            "translation_language_name": target_name
+        })
+
+        return jsonify({
+            "status": "success",
+            "message": f"Transcript translated successfully to {target_name}.",
+            "translated_transcript": translated,
+            "target_language": target_lang,
+            "target_language_name": target_name
+        })
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Translation failed: {str(e)}"}), 500
+
+
+# ============================================================
+# API - SUMMARIZATION & ACTION ITEMS
+# ============================================================
+
+@app.route("/api/summarize", methods=["POST"])
+def run_summarize():
+    """Generate structured multilingual meeting summary."""
+    data = request.get_json(silent=True) or {}
+    summary_lang = data.get("summary_language", "same")
+
+    if not os.path.exists(TRANSCRIPT_PATH):
+        return jsonify({"status": "error", "message": "No transcript.txt found. Please run Speech-to-Text first."}), 400
+
+    try:
+        result = generate_summary(summary_language=summary_lang)
+        return jsonify({
+            "status": "success",
+            "message": f"Meeting summary generated successfully in {result['language_name']}!",
+            "summary": result["summary"],
+            "language": result["language"],
+            "language_name": result["language_name"],
+            "action_items": result.get("action_items", []),
+            "decisions": result.get("decisions", [])
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Summarization failed: {str(e)}"}), 500
+
+
+@app.route("/api/action_items", methods=["POST"])
+def run_action_items():
+    """Extract action items and decisions on demand."""
+    data = request.get_json(silent=True) or {}
+    target_lang = data.get("language", "en")
+
+    state = get_persisted_state()
+    transcript = state.get("original_transcript", "")
+
+    if not transcript and os.path.exists(TRANSCRIPT_PATH):
+        with open(TRANSCRIPT_PATH, "r", encoding="utf-8") as f:
+            transcript = f.read()
+
+    if not transcript:
+        return jsonify({"status": "error", "message": "No transcript available."}), 400
+
+    try:
+        result = extract_action_items(transcript, output_language=target_lang)
+        update_persisted_state(result)
+        return jsonify({
+            "status": "success",
+            "action_items": result["action_items"],
+            "decisions": result["decisions"]
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Action items extraction failed: {str(e)}"}), 500
+
+
+# ============================================================
+# API - EMAIL DRAFTING & PRIORITIZATION
+# ============================================================
+
+@app.route("/api/generate_email", methods=["POST"])
+def run_generate_email():
+    """Generate professional follow-up email draft with priority classification."""
+    data = request.get_json(silent=True) or {}
+    email_lang = data.get("email_language", "en")
+
+    state = get_persisted_state()
+    transcript = state.get("original_transcript", "")
+    summary = state.get("summary_text", "")
+    action_items = state.get("action_items", [])
+
+    if not transcript and os.path.exists(TRANSCRIPT_PATH):
+        with open(TRANSCRIPT_PATH, "r", encoding="utf-8") as f:
+            transcript = f.read()
+
+    if not transcript:
+        return jsonify({"status": "error", "message": "No transcript available to draft email."}), 400
+
+    try:
+        draft = draft_followup_email(transcript, summary, action_items, email_language=email_lang)
+        return jsonify({
+            "status": "success",
+            "message": "Follow-up email drafted successfully!",
+            "email_draft": draft
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Email drafting failed: {str(e)}"}), 500
+
+
+# ============================================================
+# API - PDF REPORT GENERATION
+# ============================================================
+
+@app.route("/api/generate_report", methods=["POST"])
+def run_generate_report():
+    """Compile meeting intelligence into a print-ready Unicode PDF."""
+    data = request.get_json(silent=True) or {}
+    report_lang = data.get("report_language", "en")
+
+    state = get_persisted_state()
+    transcript = state.get("original_transcript", "")
+    summary = state.get("summary_text", "")
+
+    if not transcript and os.path.exists(TRANSCRIPT_PATH):
+        with open(TRANSCRIPT_PATH, "r", encoding="utf-8") as f:
+            transcript = f.read()
+
+    if not summary and os.path.exists(SUMMARY_PATH):
+        with open(SUMMARY_PATH, "r", encoding="utf-8") as f:
+            summary = f.read()
+
+    if not transcript:
+        return jsonify({"status": "error", "message": "Meeting transcript missing. Please complete Speech-to-Text first."}), 400
+
+    try:
+        pdf_file = generate_pdf_report(report_language=report_lang)
+        update_persisted_state({"report_language": report_lang})
+
+        return jsonify({
+            "status": "success",
+            "message": "Unicode PDF Meeting Report generated successfully!",
+            "download_url": "/download"
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"PDF generation failed: {str(e)}"}), 500
+
+
+# ============================================================
+# API - COLLEGE DEMO MODE
+# ============================================================
+
+@app.route("/api/load_demo", methods=["POST"])
+def run_load_demo():
+    """
+    Load a pre-configured multilingual meeting dataset for instant college viva demonstration.
+    Populates transcript, summary, action items, email draft, and triggers PDF generation.
+    """
+    data = request.get_json(silent=True) or {}
+    scenario_id = data.get("scenario_id", "telugu_project")
+
+    scenario = get_demo_scenario(scenario_id)
+
+    try:
+        # Write files
+        with open(TRANSCRIPT_PATH, "w", encoding="utf-8") as f:
+            f.write(scenario["transcript"])
+
+        with open(TRANSLATED_PATH, "w", encoding="utf-8") as f:
+            f.write(scenario.get("translation_en", ""))
+
+        with open(SUMMARY_PATH, "w", encoding="utf-8") as f:
+            f.write(scenario["summary"])
+
+        with open(EMAIL_PATH, "w", encoding="utf-8") as f:
+            draft = scenario["email_draft"]
+            f.write(f"Subject: {draft['subject']}\nPriority: {draft['priority']}\nRecipients: {draft['recipients']}\n\n{draft['body']}")
+
+        # Save to state JSON
+        update_persisted_state({
+            "original_transcript": scenario["transcript"],
+            "detected_language": scenario["language_code"],
+            "detected_language_name": scenario["language_name"],
+            "transcription_confidence": 0.98,
+            "duration": scenario["duration"],
+            "word_count": len(scenario["transcript"].split()),
+            "translated_transcript": scenario.get("translation_en", ""),
+            "translation_language": "en",
+            "translation_language_name": "English",
+            "summary_text": scenario["summary"],
+            "summary_language": scenario["language_code"],
+            "summary_language_name": scenario["language_name"],
+            "action_items": scenario["action_items"],
+            "decisions": scenario["decisions"],
+            "email_draft": scenario["email_draft"],
+            "report_language": scenario["language_code"]
+        })
+
+        # Generate Unicode PDF in meeting language
+        generate_pdf_report(report_language=scenario["language_code"])
+
+        return jsonify({
+            "status": "success",
+            "message": f"Demo scenario '{scenario['title']}' loaded successfully!",
+            "scenario": scenario
+        })
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Failed to load demo scenario: {str(e)}"}), 500
+
+
+@app.route("/api/reset", methods=["POST"])
+def run_reset():
+    """Reset meeting session for a new recording."""
+    try:
+        for fpath in [WAV_PATH, TRANSCRIPT_PATH, TRANSLATED_PATH, SUMMARY_PATH, PDF_PATH, EMAIL_PATH, STATE_PATH]:
+            if os.path.exists(fpath):
+                os.remove(fpath)
+
+        with state_lock:
+            async_task_state["status"] = "idle"
+            async_task_state["stage"] = ""
+            async_task_state["progress"] = ""
+            async_task_state["error"] = None
+
+        return jsonify({"status": "success", "message": "Session reset successfully."})
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Reset failed: {str(e)}"}), 500
+
+
+# ============================================================
+# DOWNLOAD & VIEW ROUTES
+# ============================================================
+
+@app.route("/download")
+@app.route("/download/pdf")
+@app.route("/download/Meeting_Report.pdf")
+def download_pdf():
+    """Download Meeting_Report.pdf with strict Content-Disposition and MIME headers."""
+    lang = request.args.get("lang") or request.args.get("report_language")
+    if lang:
+        try:
+            generate_pdf_report(report_language=lang)
+            update_persisted_state({"report_language": lang})
+        except Exception as e:
+            print(f"[WARN] On-demand PDF generation for {lang} failed: {e}", file=sys.stderr)
+    elif not os.path.exists(PDF_PATH):
+        try:
+            state = get_persisted_state()
+            rep_lang = state.get("report_language", "en")
+            generate_pdf_report(report_language=rep_lang)
+        except Exception as e:
+            return f"PDF report could not be generated: {e}", 500
+
+    if os.path.exists(PDF_PATH):
+        response = send_file(
+            PDF_PATH,
+            as_attachment=True,
+            download_name="Meeting_Report.pdf",
+            mimetype="application/pdf"
         )
-        if uploaded_file is not None:
-            audio_bytes = uploaded_file.read()
-            with open(WAV_PATH, "wb") as f:
-                f.write(audio_bytes)
-            st.success(f"✅ Uploaded {uploaded_file.name} successfully saved.")
-            st.audio(audio_bytes)
+        response.headers["Content-Disposition"] = 'attachment; filename="Meeting_Report.pdf"'
+        response.headers["Content-Type"] = "application/pdf"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
+    return "PDF report not found.", 404
 
-    st.divider()
 
-    # Transcribe Trigger Section
-    has_audio_on_disk = os.path.exists(WAV_PATH) and os.path.getsize(WAV_PATH) > 1000
+@app.route("/view/pdf")
+@app.route("/view/Meeting_Report.pdf")
+def view_pdf():
+    """View Meeting_Report.pdf inline inside the browser."""
+    lang = request.args.get("lang") or request.args.get("report_language")
+    if lang:
+        try:
+            generate_pdf_report(report_language=lang)
+            update_persisted_state({"report_language": lang})
+        except Exception as e:
+            print(f"[WARN] On-demand PDF generation for {lang} failed: {e}", file=sys.stderr)
 
-    col_stt_lang, col_stt_btn = st.columns([2, 1])
-    with col_stt_lang:
-        selected_stt_lang = st.selectbox(
-            "Spoken Language Hint (Choose 'Auto Detect' for automatic recognition):",
-            options=LANG_CODES,
-            format_func=lambda c: LANG_OPTIONS[c],
-            index=0
+    if os.path.exists(PDF_PATH):
+        response = send_file(
+            PDF_PATH,
+            as_attachment=False,
+            download_name="Meeting_Report.pdf",
+            mimetype="application/pdf"
         )
+        response.headers["Content-Disposition"] = 'inline; filename="Meeting_Report.pdf"'
+        response.headers["Content-Type"] = "application/pdf"
+        return response
+    return "PDF report not found. Please generate report first.", 404
 
-    with col_stt_btn:
-        st.write("")
-        st.write("")
-        btn_transcribe = st.button(
-            "⚡ Transcribe Audio Now",
-            type="primary",
-            use_container_width=True,
-            disabled=not has_audio_on_disk
+
+@app.route("/download/transcript")
+@app.route("/download/transcript/meeting_transcript.txt")
+def download_transcript():
+    if os.path.exists(TRANSCRIPT_PATH):
+        response = send_file(
+            TRANSCRIPT_PATH,
+            as_attachment=True,
+            download_name="meeting_transcript.txt",
+            mimetype="text/plain; charset=utf-8"
         )
-
-    if not has_audio_on_disk:
-        st.info("ℹ️ Record audio with the microphone above, upload an audio file, or click a Viva Demo scenario in the sidebar to begin.")
-
-    if btn_transcribe and has_audio_on_disk:
-        with st.spinner("Running Groq Whisper speech recognition..."):
-            try:
-                res = transcribe_audio(WAV_PATH, language=selected_stt_lang)
-
-                if not res or not res.get("text", "").strip():
-                    raise RuntimeError(
-                        "Groq returned an empty transcript. Please record clear speech and try again."
-                    )
-
-                st.session_state["original_transcript"] = res["text"]
-                st.session_state["detected_language"] = res.get("language_code") or "en"
-                st.session_state["detected_language_name"] = res.get("language_name") or get_language_name(st.session_state["detected_language"])
-                st.session_state["transcription_confidence"] = max(0.0, min(1.0, float(res.get("confidence", 0.95))))
-                st.session_state["duration"] = res.get("duration", 0)
-                st.session_state["word_count"] = res.get("word_count", len(res["text"].split()))
-
-                with open(TRANSCRIPT_PATH, "w", encoding="utf-8") as f:
-                    f.write(res["text"])
-
-                save_meeting_state({
-                    "original_transcript": res["text"],
-                    "detected_language": st.session_state["detected_language"],
-                    "detected_language_name": st.session_state["detected_language_name"],
-                    "transcription_confidence": st.session_state["transcription_confidence"],
-                    "duration": st.session_state["duration"],
-                    "word_count": st.session_state["word_count"]
-                })
-
-                st.success(
-                    f"🎉 Speech recognized as {st.session_state['detected_language_name']} "
-                    f"({int(st.session_state['transcription_confidence'] * 100)}% confidence)."
-                )
-                st.rerun()
-
-            except Exception as e:
-                st.error(f"❌ Speech recognition failed: {e}")
-                with st.expander("Technical error details"):
-                    st.code(str(e))
+        response.headers["Content-Disposition"] = 'attachment; filename="meeting_transcript.txt"'
+        return response
+    return "Transcript not found.", 404
 
 
-# ------------------------------------------------------------------------------
-# TAB 2: ORIGINAL TRANSCRIPT & TRANSLATION
-# ------------------------------------------------------------------------------
-with tab_transcript:
-    st.markdown("<div class='module-banner'><b>Module 2 & 3: Speech-to-Text & Translation</b> — The original native script (Telugu, Hindi, Tamil, etc.) is preserved without loss, and translated on-demand into English or other languages.</div>", unsafe_allow_html=True)
-
-    col_orig, col_trans = st.columns(2)
-
-    with col_orig:
-        st.markdown(f"#### 📝 Original Transcript (`{st.session_state['detected_language_name']}`)")
-        orig_text = st.text_area(
-            "Original native speech script:",
-            value=st.session_state["original_transcript"],
-            height=320,
-            help="Preserves the exact native script, phrasing, and project terminology."
+@app.route("/download/translated")
+@app.route("/download/translated/translated_transcript.txt")
+def download_translated():
+    if os.path.exists(TRANSLATED_PATH):
+        response = send_file(
+            TRANSLATED_PATH,
+            as_attachment=True,
+            download_name="translated_transcript.txt",
+            mimetype="text/plain; charset=utf-8"
         )
+        response.headers["Content-Disposition"] = 'attachment; filename="translated_transcript.txt"'
+        return response
+    return "Translated transcript not found.", 404
 
-        col_orig_btn1, col_orig_btn2 = st.columns([1, 1])
-        with col_orig_btn1:
-            st.download_button(
-                "📥 Download TXT",
-                data=st.session_state["original_transcript"].encode("utf-8"),
-                file_name="original_transcript.txt",
-                mime="text/plain",
-                use_container_width=True,
-                disabled=not bool(st.session_state["original_transcript"])
-            )
 
-    with col_trans:
-        st.markdown("#### 🔄 Context-Aware Translation")
-
-        col_tlang, col_tbtn = st.columns([2, 1])
-        with col_tlang:
-            trans_target = st.selectbox(
-                "Translate To:",
-                options=[c for c in LANG_CODES if c != "auto"],
-                format_func=lambda c: LANG_OPTIONS[c],
-                index=[c for c in LANG_CODES if c != "auto"].index(st.session_state["translation_language"]) if st.session_state["translation_language"] in LANG_CODES else 0
-            )
-
-        with col_tbtn:
-            st.write("")
-            st.write("")
-            btn_run_translate = st.button(
-                "🌐 Translate",
-                type="primary",
-                use_container_width=True,
-                disabled=not bool(st.session_state["original_transcript"])
-            )
-
-        if btn_run_translate and st.session_state["original_transcript"]:
-            with st.spinner(f"Translating into {LANG_OPTIONS[trans_target]}..."):
-                try:
-                    translated = translate_text(
-                        st.session_state["original_transcript"],
-                        target_language=trans_target,
-                        source_language=st.session_state["detected_language"]
-                    )
-                    st.session_state["translated_transcript"] = translated
-                    st.session_state["translation_language"] = trans_target
-
-                    with open(TRANSLATED_PATH, "w", encoding="utf-8") as f:
-                        f.write(translated)
-
-                    save_meeting_state({
-                        "translated_transcript": translated,
-                        "translation_language": trans_target,
-                        "translation_language_name": get_language_name(trans_target)
-                    })
-
-                    st.success(f"Translation completed in {get_language_name(trans_target)}!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Translation failed: {e}")
-
-        trans_text = st.text_area(
-            "Translated text:",
-            value=st.session_state["translated_transcript"],
-            height=250,
+@app.route("/download/summary")
+@app.route("/download/summary/meeting_summary.txt")
+def download_summary():
+    if os.path.exists(SUMMARY_PATH):
+        response = send_file(
+            SUMMARY_PATH,
+            as_attachment=True,
+            download_name="meeting_summary.txt",
+            mimetype="text/plain; charset=utf-8"
         )
+        response.headers["Content-Disposition"] = 'attachment; filename="meeting_summary.txt"'
+        return response
+    return "Summary not found.", 404
 
-        st.download_button(
-            "📥 Download Translated TXT",
-            data=st.session_state["translated_transcript"].encode("utf-8"),
-            file_name="translated_transcript.txt",
-            mime="text/plain",
-            use_container_width=True,
-            disabled=not bool(st.session_state["translated_transcript"])
+
+@app.route("/download/email")
+@app.route("/download/email/followup_email.txt")
+def download_email():
+    if os.path.exists(EMAIL_PATH):
+        response = send_file(
+            EMAIL_PATH,
+            as_attachment=True,
+            download_name="followup_email.txt",
+            mimetype="text/plain; charset=utf-8"
         )
+        response.headers["Content-Disposition"] = 'attachment; filename="followup_email.txt"'
+        return response
+    return "Email draft not found.", 404
 
 
-# ------------------------------------------------------------------------------
-# TAB 3: EXECUTIVE SUMMARY & ACTION ITEMS
-# ------------------------------------------------------------------------------
-with tab_summary:
-    st.markdown("<div class='module-banner'><b>Module 4: Structured Summarization & Action Extraction</b> — 7-section executive briefing with extracted deliverables, assigned owners, deadlines, and key decisions.</div>", unsafe_allow_html=True)
 
-    col_sum_opt, col_sum_btn = st.columns([2, 1])
-    with col_sum_opt:
-        sum_lang_choice = st.selectbox(
-            "Summary Language:",
-            options=["same"] + [c for c in LANG_CODES if c != "auto"],
-            format_func=lambda c: "Same as Spoken Meeting Language" if c == "same" else LANG_OPTIONS[c],
-            index=0
-        )
+# ============================================================
+# PRODUCTION SERVER ENTRY
+# ============================================================
 
-    with col_sum_btn:
-        st.write("")
-        st.write("")
-        btn_run_summary = st.button(
-            "⚡ Generate Summary & Actions",
-            type="primary",
-            use_container_width=True,
-            disabled=not bool(st.session_state["original_transcript"])
-        )
-
-    if btn_run_summary and st.session_state["original_transcript"]:
-        with st.spinner("Synthesizing executive summary and extracting action items..."):
-            try:
-                # Ensure transcript is on disk
-                with open(TRANSCRIPT_PATH, "w", encoding="utf-8") as f:
-                    f.write(st.session_state["original_transcript"])
-
-                # Run summary & actions
-                sum_res = generate_summary(summary_language=sum_lang_choice)
-                act_res = extract_action_items(st.session_state["original_transcript"], output_language="en" if sum_lang_choice == "same" else sum_lang_choice)
-
-                st.session_state["summary"] = sum_res["summary"]
-                st.session_state["summary_language"] = sum_res["language"]
-                st.session_state["action_items"] = act_res.get("action_items", [])
-                st.session_state["decisions"] = act_res.get("decisions", [])
-
-                save_meeting_state({
-                    "summary_text": sum_res["summary"],
-                    "summary_language": sum_res["language"],
-                    "summary_language_name": sum_res["language_name"],
-                    "action_items": act_res.get("action_items", []),
-                    "decisions": act_res.get("decisions", [])
-                })
-
-                st.success("Executive summary and action items extracted successfully!")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Summarization error: {e}")
-
-    st.divider()
-
-    col_sview, col_aview = st.columns([1.1, 0.9])
-
-    with col_sview:
-        st.markdown("#### 📋 7-Section Executive Briefing")
-        if st.session_state["summary"]:
-            st.markdown(f"<div class='native-script-box'>{st.session_state['summary']}</div>", unsafe_allow_html=True)
-            st.download_button(
-                "📥 Download Summary TXT",
-                data=st.session_state["summary"].encode("utf-8"),
-                file_name="executive_summary.txt",
-                mime="text/plain"
-            )
-        else:
-            st.info("Click 'Generate Summary & Actions' above to create structured meeting notes.")
-
-    with col_aview:
-        st.markdown("#### 📌 Extracted Action Items & Deliverables")
-        action_items = st.session_state["action_items"]
-        if action_items:
-            import pandas as pd
-            df_actions = pd.DataFrame(action_items)
-            st.dataframe(df_actions, use_container_width=True, hide_index=True)
-        else:
-            st.caption("No action items extracted yet.")
-
-        st.markdown("#### ✅ Key Decisions Made")
-        decisions = st.session_state["decisions"]
-        if decisions:
-            for d in decisions:
-                st.markdown(f"- ✅ **{d}**")
-        else:
-            st.caption("No decisions logged yet.")
-
-
-# ------------------------------------------------------------------------------
-# TAB 4: EMAIL DRAFTING ASSISTANT
-# ------------------------------------------------------------------------------
-with tab_email:
-    st.markdown("<div class='module-banner'><b>Module 5: Follow-Up Email Assistant</b> — Evaluates urgency, formats executive subject lines, and drafts email follow-ups with team action items.</div>", unsafe_allow_html=True)
-
-    col_em_opt, col_em_btn = st.columns([2, 1])
-    with col_em_opt:
-        email_lang_choice = st.selectbox(
-            "Draft Email In:",
-            options=[c for c in LANG_CODES if c != "auto"],
-            format_func=lambda c: LANG_OPTIONS[c],
-            index=[c for c in LANG_CODES if c != "auto"].index("en")
-        )
-
-    with col_em_btn:
-        st.write("")
-        st.write("")
-        btn_run_email = st.button(
-            "✉️ Draft Follow-Up Email",
-            type="primary",
-            use_container_width=True,
-            disabled=not bool(st.session_state["original_transcript"])
-        )
-
-    if btn_run_email and st.session_state["original_transcript"]:
-        with st.spinner("Drafting prioritized executive email..."):
-            try:
-                draft = draft_followup_email(
-                    transcript=st.session_state["original_transcript"],
-                    summary=st.session_state["summary"],
-                    action_items=st.session_state["action_items"],
-                    email_language=email_lang_choice
-                )
-                st.session_state["email_draft"] = draft
-                save_meeting_state({"email_draft": draft})
-                st.success(f"Email drafted (Priority: {draft.get('priority', 'Normal')})!")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Email drafting failed: {e}")
-
-    email_data = st.session_state["email_draft"] or {}
-    if email_data.get("body"):
-        prio = email_data.get("priority", "Medium")
-        prio_class = f"priority-{prio.lower()}"
-
-        st.markdown(f"""
-        <div style='margin-bottom: 16px;'>
-            <span class='priority-pill {prio_class}'>Priority: {prio}</span>
-            <span style='color: #64748b; font-size: 0.88rem; margin-left: 10px;'>{email_data.get("priority_reason", "")}</span>
-        </div>
-        """, unsafe_allow_html=True)
-
-        col_esubj, col_erecip = st.columns([1, 1])
-        with col_esubj:
-            st.text_input("Subject Line:", value=email_data.get("subject", ""), key="input_email_subj")
-        with col_erecip:
-            st.text_input("Suggested Recipients:", value=email_data.get("recipients", ""), key="input_email_recip")
-
-        st.text_area("Email Body:", value=email_data.get("body", ""), height=260, key="input_email_body")
-
-        # Mailto button
-        import urllib.parse
-        subj_enc = urllib.parse.quote(email_data.get("subject", "Meeting Follow-up"))
-        body_enc = urllib.parse.quote(email_data.get("body", ""))
-        mailto_url = f"mailto:?subject={subj_enc}&body={body_enc}"
-
-        col_ebtn1, col_ebtn2 = st.columns([1, 1])
-        with col_ebtn1:
-            st.link_button("📤 Open in Email Client (Mailto)", mailto_url, use_container_width=True)
-        with col_ebtn2:
-            st.download_button(
-                "📥 Download Email (.eml / .txt)",
-                data=f"Subject: {email_data.get('subject')}\n\n{email_data.get('body')}".encode("utf-8"),
-                file_name="meeting_followup_email.txt",
-                mime="text/plain",
-                use_container_width=True
-            )
-    else:
-        st.info("Click 'Draft Follow-Up Email' to compose a prioritized message from the transcript.")
-
-
-# ------------------------------------------------------------------------------
-# TAB 5: UNICODE PDF REPORT GENERATOR
-# ------------------------------------------------------------------------------
-with tab_pdf:
-    st.markdown("<div class='module-banner'><b>Module 6: Unicode PDF Engine</b> — Embedded Google Noto TrueType fonts ensure flawless rendering of Telugu, Tamil, Hindi, Kannada, Malayalam, Bengali, and English with zero tofu boxes.</div>", unsafe_allow_html=True)
-
-    col_pdf_opt, col_pdf_btn = st.columns([2, 1])
-    with col_pdf_opt:
-        pdf_lang_choice = st.selectbox(
-            "Compile PDF Report In:",
-            options=["same"] + [c for c in LANG_CODES if c != "auto"],
-            format_func=lambda c: "Same as Meeting Language" if c == "same" else LANG_OPTIONS[c],
-            index=0
-        )
-
-    with col_pdf_btn:
-        st.write("")
-        st.write("")
-        btn_run_pdf = st.button(
-            "📄 Generate Unicode PDF",
-            type="primary",
-            use_container_width=True,
-            disabled=not bool(st.session_state["original_transcript"])
-        )
-
-    if btn_run_pdf and st.session_state["original_transcript"]:
-        with st.spinner("Compiling professional PDF with embedded Google Noto fonts..."):
-            try:
-                # Save latest transcript and summary to disk
-                with open(TRANSCRIPT_PATH, "w", encoding="utf-8") as f:
-                    f.write(st.session_state["original_transcript"])
-
-                pdf_bytes = generate_pdf_report_bytes(report_language=pdf_lang_choice)
-                if pdf_bytes and len(pdf_bytes) > 1000:
-                    st.session_state["pdf_bytes"] = pdf_bytes
-                    st.success(f"🎉 Unicode PDF compiled successfully ({len(pdf_bytes):,} bytes)!")
-                    st.rerun()
-                else:
-                    st.error("PDF generator returned an empty file. Please check report data.")
-            except Exception as e:
-                st.error(f"PDF generation failed: {e}")
-
-    st.divider()
-
-    # If PDF is generated or exists on disk, show download button
-    pdf_ready = False
-    current_pdf_bytes = st.session_state.get("pdf_bytes")
-
-    if not current_pdf_bytes and os.path.exists(PDF_PATH) and os.path.getsize(PDF_PATH) > 1000:
-        with open(PDF_PATH, "rb") as f:
-            current_pdf_bytes = f.read()
-            st.session_state["pdf_bytes"] = current_pdf_bytes
-
-    if current_pdf_bytes:
-        st.success("✅ Multilingual Unicode PDF Report is ready for download!")
-        st.download_button(
-            label="⬇️ Download Meeting_Report.pdf",
-            data=current_pdf_bytes,
-            file_name="Meeting_Report.pdf",
-            mime="application/pdf",
-            type="primary",
-            use_container_width=True
-        )
-
-        st.markdown("""
-        > **Font Guarantee**: The compiled PDF embeds:
-        > - `NotoSansTelugu` for Telugu (తెలుగు)
-        > - `NotoSansDevanagari` for Hindi (हिन्दी) & Marathi
-        > - `NotoSansTamil` for Tamil (தமிழ்)
-        > - `NotoSansKannada` for Kannada (ಕನ್ನಡ)
-        > - `NotoSansMalayalam` for Malayalam (മലയാളം)
-        > - `NotoSansBengali` for Bengali (বাংলা)
-        > - `NotoSans` for English & Latin scripts
-        """)
-    else:
-        st.info("Click 'Generate Unicode PDF' above to compile the official meeting report.")
-
-
-# ------------------------------------------------------------------------------
-# TAB 6: ARCHITECTURE & VIVA GUIDE
-# ------------------------------------------------------------------------------
-with tab_arch:
-    st.markdown("### 🏛️ System Architecture & College Viva Guide")
-    st.markdown("""
-    #### 🔄 End-to-End Multilingual AI Pipeline
-    ```
-    [Microphone / Upload] ➡️ [Container Header Detection] ➡️ [Groq Whisper STT (v3 Turbo)]
-                                                                    ⬇️
-    [Unicode PDF Report] ⬅️ [Email Drafter] ⬅️ [Action Extraction] ⬅️ [Original Transcript (Native Script)]
-                                                                    ⬇️
-                                                        [Context-Aware Translator]
-    ```
-    
-    #### 🎓 Viva Demonstration Questions & Answers:
-    
-    1. **Why does the system preserve the original language transcript?**
-       - Most multilingual systems translate everything immediately into English, destroying native nuances and conversational context. Our system retains the original script (e.g., Telugu / Tamil / Hindi) in Module 2, allowing bilingual side-by-side verification before translation.
-       
-    2. **How does the PDF avoid broken box characters (`□□□`)?**
-       - We embed language-specific Google Noto TrueType fonts dynamically using ReportLab's `TTFont` and script detection heuristics in `language_detector.py`. When Telugu text is detected, `NotoSansTelugu-Regular.ttf` is selected; for Hindi, `NotoSansDevanagari-Regular.ttf` is used.
-       
-    3. **How is high speed achieved during speech recognition?**
-       - We employ `whisper-large-v3-turbo` on Groq's high-speed inference engine, combined with `detect_audio_container()` in `speech_to_text.py` which inspects binary magic bytes and prevents transcoding mismatches, completing transcription in **~3 seconds**.
-       
-    4. **How is the application deployed to Render / Streamlit?**
-       - The codebase runs natively with `streamlit run app.py`. All API credentials are read securely from `st.secrets["GROQ_API_KEY"]` with automatic environment fallback, and all bundled fonts in `fonts/` are packaged directly in the repository.
-    """)
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    host = os.environ.get("HOST", "0.0.0.0")
+    app.run(host=host, port=port, debug=False)
